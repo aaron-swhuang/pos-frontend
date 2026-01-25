@@ -1,0 +1,10 @@
+/* Tailwind v4 統一使用單一導入指令 */
+@import "tailwindcss";
+
+/* 修正：在 v4 中，如果你要在 CSS 中使用 @apply，
+   必須確保已經導入了 tailwindcss。
+   這會解決 "unknown utility class bg-slate-50" 的錯誤 */
+body {
+  margin: 0;
+  @apply bg-slate-50 text-slate-900;
+}
