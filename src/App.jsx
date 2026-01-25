@@ -6,6 +6,7 @@ import {
   Settings,
   LogOut,
   Plus,
+  Minus,
   Trash2,
   ChevronRight,
   Store,
@@ -74,7 +75,7 @@ const Sidebar = () => {
           <Link
             key={item.path}
             to={item.path}
-            className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${location.pathname === item.path ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800'
+            className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${location.pathname === item.path ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
               }`}
           >
             {item.icon}
@@ -120,22 +121,45 @@ const LoginPage = () => {
           <h2 className="text-2xl font-bold text-white">POS 系統登入</h2>
         </div>
         <form onSubmit={handleLogin} className="p-10 space-y-6">
-          <input className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" placeholder="帳號" onChange={e => setAuth({ ...auth, user: e.target.value })} />
-          <input type="password" name="password" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" placeholder="密碼" onChange={e => setAuth({ ...auth, pass: e.target.value })} />
-          <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg">登入系統</button>
+          <input className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-900" placeholder="帳號" onChange={e => setAuth({ ...auth, user: e.target.value })} />
+          <input type="password" name="password" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-900" placeholder="密碼" onChange={e => setAuth({ ...auth, pass: e.target.value })} />
+          <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg">登入系統</button>
         </form>
       </div>
     </div>
   );
 };
 
-// --- 4. 前台收銀 ---
+// --- 4. 前台收銀 (支援多數量) ---
 const POSPage = () => {
   const { menu, setOrders, orders } = useContext(POSContext);
   const [cart, setCart] = useState([]);
 
-  const addToCart = (p) => setCart([...cart, { ...p, cartId: Date.now() + Math.random() }]);
-  const total = cart.reduce((s, i) => s + i.price, 0);
+  const addToCart = (product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.id === product.id);
+      if (existingItem) {
+        return prevCart.map(item =>
+          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prevCart, { ...product, quantity: 1 }];
+    });
+  };
+
+  const updateQuantity = (id, delta) => {
+    setCart(prevCart =>
+      prevCart.map(item => {
+        if (item.id === id) {
+          const newQty = Math.max(0, item.quantity + delta);
+          return { ...item, quantity: newQty };
+        }
+        return item;
+      }).filter(item => item.quantity > 0)
+    );
+  };
+
+  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   const checkout = () => {
     if (cart.length === 0) return;
@@ -168,18 +192,26 @@ const POSPage = () => {
       <div className="w-96 bg-white rounded-3xl shadow-xl flex flex-col h-[calc(100vh-140px)] sticky top-8">
         <div className="p-6 border-b flex justify-between items-center"><h3 className="font-bold text-lg text-slate-900">購物車</h3></div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {cart.map(i => (
-            <div key={i.cartId} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <span className="font-bold text-slate-700 text-sm">{i.name}</span>
-              <div className="flex items-center space-x-3"><span className="font-black text-sm text-slate-900">${i.price}</span>
-                <button onClick={() => setCart(cart.filter(c => c.cartId !== i.cartId))} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
+          {cart.map(item => (
+            <div key={item.id} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-bold text-slate-700 text-sm">{item.name}</span>
+                <span className="font-black text-slate-900">${item.price * item.quantity}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1 bg-white border rounded-lg">
+                  <button onClick={() => updateQuantity(item.id, -1)} className="p-1 hover:bg-slate-50 text-slate-400"><Minus size={14} /></button>
+                  <span className="w-8 text-center text-sm font-bold text-slate-700">{item.quantity}</span>
+                  <button onClick={() => updateQuantity(item.id, 1)} className="p-1 hover:bg-slate-50 text-slate-400"><Plus size={14} /></button>
+                </div>
+                <button onClick={() => updateQuantity(item.id, -999)} className="text-slate-300 hover:text-red-500"><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
         </div>
         <div className="p-6 bg-slate-900 text-white rounded-b-3xl">
           <div className="flex justify-between items-center mb-6"><span>總計</span><span className="text-3xl font-black">${total}</span></div>
-          <button onClick={checkout} disabled={cart.length === 0} className="w-full bg-blue-600 py-4 rounded-xl font-bold disabled:bg-slate-800 disabled:text-slate-600 transition-all active:scale-95">完成結帳</button>
+          <button onClick={checkout} disabled={cart.length === 0} className="w-full bg-blue-600 py-4 rounded-xl font-bold transition-all active:scale-95">完成結帳</button>
         </div>
       </div>
     </div>
@@ -203,15 +235,16 @@ const AdminPage = () => {
     <div className="max-w-4xl">
       <h2 className="text-2xl font-bold text-slate-900 mb-8">菜單管理中心</h2>
       <form onSubmit={handleAdd} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex gap-4 mb-8">
-        <input className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" placeholder="商品名稱" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
-        <input type="number" className="w-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" placeholder="價格" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
-        <button type="submit" className="bg-slate-900 text-white px-8 rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center shadow-lg"><Plus size={20} className="mr-1" /> 新增</button>
+        <input className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-900" placeholder="商品名稱" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+        <input type="number" className="w-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-900" placeholder="價格" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} />
+        <button type="submit" className="bg-slate-900 text-white px-8 rounded-xl font-bold hover:bg-slate-800 shadow-lg"><Plus size={20} className="mr-1" /> 新增</button>
       </form>
       <div className="space-y-3">
         {menu.map(item => (
           <div key={item.id} className="bg-white px-8 py-5 rounded-2xl border border-slate-50 flex justify-between items-center shadow-sm">
             <span className="font-bold text-slate-700">{item.name}</span>
-            <div className="flex items-center space-x-10"><span className="text-blue-600 font-black text-xl">${item.price}</span>
+            <div className="flex items-center space-x-10 text-slate-900">
+              <span className="text-blue-600 font-black text-xl">${item.price}</span>
               <button onClick={() => setMenu(menu.filter(m => m.id !== item.id))} className="text-slate-300 hover:text-red-500"><Trash2 size={20} /></button>
             </div>
           </div>
@@ -221,7 +254,7 @@ const AdminPage = () => {
   );
 };
 
-// --- 6. 報表分析與詳細日結報表 ---
+// --- 6. 報表分析 ---
 const DashboardPage = () => {
   const { orders, setOrders, dailySummaries, setDailySummaries } = useContext(POSContext);
   const [expandOrderId, setExpandOrderId] = useState(null);
@@ -229,8 +262,7 @@ const DashboardPage = () => {
   const [showHistory, setShowHistory] = useState(false);
 
   const todayStr = new Date().toLocaleDateString();
-  const todayOrders = orders.filter(o => o.date === todayStr);
-  const todayRevenue = todayOrders.reduce((s, o) => s + o.total, 0);
+  const todayRevenue = orders.filter(o => o.date === todayStr).reduce((s, o) => s + o.total, 0);
 
   const handleDailyClosing = () => {
     const unclosedOrders = orders.filter(o => o.status === 'unclosed');
@@ -239,7 +271,7 @@ const DashboardPage = () => {
       return;
     }
 
-    if (!window.confirm("確定要執行日結嗎？這將會彙整當前所有未結算訂單並產生詳細統計。")) return;
+    if (!window.confirm("確定要執行日結嗎？")) return;
 
     const grouped = unclosedOrders.reduce((acc, order) => {
       const date = order.date;
@@ -259,85 +291,60 @@ const DashboardPage = () => {
       acc[date].relatedOrderIds.push(order.id);
 
       order.items.forEach(item => {
-        acc[date].itemSales[item.name] = (acc[date].itemSales[item.name] || 0) + 1;
+        const qty = item.quantity || 1;
+        acc[date].itemSales[item.name] = (acc[date].itemSales[item.name] || 0) + qty;
       });
 
       return acc;
     }, {});
 
-    const newSummaries = Object.values(grouped);
-    setDailySummaries([...dailySummaries, ...newSummaries]);
-
-    const updatedOrders = orders.map(o => ({ ...o, status: 'closed' }));
-    setOrders(updatedOrders);
-
-    alert("日結作業完成！已產生詳細彙整報表。");
+    setDailySummaries([...dailySummaries, ...Object.values(grouped)]);
+    setOrders(orders.map(o => ({ ...o, status: 'closed' })));
+    alert("日結作業完成！");
   };
 
   return (
     <div className="max-w-5xl">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 text-slate-900">
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-3xl text-white shadow-xl flex flex-col justify-between">
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-3xl text-white shadow-xl flex flex-col justify-between min-h-[220px]">
           <div>
-            <p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2">今日即時營收</p>
-            <h3 className="text-5xl font-black">${todayRevenue}</h3>
+            <p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2">今日營收</p>
+            <h3 className="text-5xl font-black text-white">${todayRevenue}</h3>
           </div>
-          <button
-            onClick={handleDailyClosing}
-            className="mt-6 flex items-center justify-center space-x-2 bg-white/20 hover:bg-white/30 px-6 py-3 rounded-xl font-bold transition-all border border-white/30"
-          >
+          <button onClick={handleDailyClosing} className="mt-6 flex items-center justify-center space-x-2 bg-white/20 hover:bg-white/30 px-6 py-3 rounded-xl font-bold border border-white/30">
             <CalendarCheck size={20} />
             <span>執行日結結帳</span>
           </button>
         </div>
         <div className="bg-white p-10 rounded-3xl border border-slate-100 flex flex-col justify-center shadow-sm">
-          <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">未結訂單總數</p>
-          <h3 className="text-5xl font-black text-slate-800">
-            {orders.filter(o => o.status === 'unclosed').length}
-            <span className="text-xl font-normal text-slate-300 italic ml-2">筆待結</span>
-          </h3>
+          <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">未結訂單</p>
+          <h3 className="text-5xl font-black text-slate-800">{orders.filter(o => o.status === 'unclosed').length} <span className="text-xl font-normal text-slate-300 italic">筆待結</span></h3>
         </div>
       </div>
 
       <div className="flex space-x-4 mb-6 border-b border-slate-200">
-        <button
-          onClick={() => setShowHistory(false)}
-          className={`pb-4 px-4 font-bold transition-all border-b-2 ${!showHistory ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}
-        >
-          已結日報表彙整
-        </button>
-        <button
-          onClick={() => setShowHistory(true)}
-          className={`pb-4 px-4 font-bold transition-all border-b-2 ${showHistory ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}
-        >
-          所有交易明細紀錄
-        </button>
+        <button onClick={() => setShowHistory(false)} className={`pb-4 px-4 font-bold transition-all border-b-2 ${!showHistory ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>日報彙整</button>
+        <button onClick={() => setShowHistory(true)} className={`pb-4 px-4 font-bold transition-all border-b-2 ${showHistory ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>交易明細</button>
       </div>
 
       {!showHistory ? (
         <div className="space-y-4">
-          <h3 className="text-slate-400 font-bold text-xs uppercase tracking-widest px-2">歷史日報表清單</h3>
           {[...dailySummaries].reverse().map((summary) => {
             const isExpand = expandSummaryId === summary.id;
-            // 修正點：加入 (summary.relatedOrderIds || []) 防禦性檢查，避免舊資料導致報錯
             const summaryOrders = orders.filter(o => (summary.relatedOrderIds || []).includes(o.id));
-
             return (
               <div key={summary.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all">
-                <div
-                  onClick={() => setExpandSummaryId(isExpand ? null : summary.id)}
-                  className={`p-6 flex items-center justify-between cursor-pointer transition-colors ${isExpand ? 'bg-blue-50/50' : ''}`}
-                >
+                <div onClick={() => setExpandSummaryId(isExpand ? null : summary.id)} className={`p-6 flex items-center justify-between cursor-pointer ${isExpand ? 'bg-blue-50/50' : ''}`}>
                   <div className="flex items-center space-x-4 text-slate-900">
                     <div className="bg-green-100 text-green-600 p-3 rounded-xl"><FileText /></div>
                     <div>
-                      <div className="font-bold text-slate-800 text-lg">{summary.date} 營收彙整報表</div>
-                      <div className="text-xs text-slate-400 font-mono">結案時間：{summary.closedAt}</div>
+                      <div className="font-bold text-slate-800 text-lg">{summary.date} 彙整報表</div>
+                      <div className="text-xs text-slate-400">結帳時間：{summary.closedAt}</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-8 text-slate-900">
                     <div className="text-right">
-                      <div className="text-xs text-slate-400 uppercase font-bold">當日總營收</div>
+                      <div className="text-xs text-slate-400 uppercase font-bold">總營收</div>
                       <div className="text-2xl font-black text-blue-600">${summary.total}</div>
                     </div>
                     {isExpand ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}
@@ -345,67 +352,54 @@ const DashboardPage = () => {
                 </div>
 
                 {isExpand && (
-                  <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 animate-in fade-in space-y-8">
+                  <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 animate-in fade-in space-y-8 text-slate-900">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div>
-                        <h4 className="text-sm font-bold text-slate-500 mb-4 flex items-center">
-                          <TrendingUp size={16} className="mr-2 text-blue-500" /> 銷售品項加總
-                        </h4>
+                        <h4 className="text-sm font-bold text-slate-500 mb-4 flex items-center"><TrendingUp size={16} className="mr-2 text-blue-500" /> 品項銷量統計</h4>
                         <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                           {Object.entries(summary.itemSales || {}).map(([name, count]) => (
                             <div key={name} className="flex justify-between items-center text-slate-900">
                               <span className="text-slate-600 font-medium">{name}</span>
-                              <div className="flex items-center">
-                                <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{count} 份</span>
-                              </div>
+                              <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{count} 份</span>
                             </div>
                           ))}
-                          {Object.keys(summary.itemSales || {}).length === 0 && <div className="text-slate-400 text-sm">無品項銷售數據</div>}
                         </div>
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest text-slate-900">營運指標</h4>
                         <div className="grid grid-cols-2 gap-4 text-slate-900">
                           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                            <span className="text-xs text-slate-400 block mb-1">總成交數</span>
-                            <span className="text-xl font-bold text-slate-800">{summary.orderCount} 筆</span>
+                            <span className="text-xs text-slate-400 block mb-1">成交數</span>
+                            <span className="text-xl font-bold">{summary.orderCount} 筆</span>
                           </div>
                           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                            <span className="text-xs text-slate-400 block mb-1">平均單價</span>
-                            <span className="text-xl font-bold text-slate-800">${summary.orderCount > 0 ? (summary.total / summary.orderCount).toFixed(0) : 0}</span>
+                            <span className="text-xs text-slate-400 block mb-1">平均客單</span>
+                            <span className="text-xl font-bold">${summary.orderCount > 0 ? (summary.total / summary.orderCount).toFixed(0) : 0}</span>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="border-t border-slate-200 pt-8">
-                      <h4 className="text-sm font-bold text-slate-500 mb-4 flex items-center">
-                        <Receipt size={16} className="mr-2 text-blue-500" /> 當日原始訂單明細 (共 {summaryOrders.length} 筆)
-                      </h4>
+                      <h4 className="text-sm font-bold text-slate-500 mb-4 flex items-center text-slate-900"><Receipt size={16} className="mr-2 text-blue-500" /> 原始訂單明細</h4>
                       <div className="space-y-2">
                         {summaryOrders.map((order) => {
                           const isOrderExpand = expandOrderId === order.id;
                           return (
                             <div key={order.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandOrderId(isOrderExpand ? null : order.id);
-                                }}
-                                className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 text-slate-900"
-                              >
+                              <div onClick={(e) => { e.stopPropagation(); setExpandOrderId(isOrderExpand ? null : order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50">
                                 <div className="flex-1 text-sm font-bold text-slate-600">{order.time}</div>
-                                <div className="flex-1 text-xs text-slate-400 font-mono">#{order.id}</div>
+                                <div className="flex-1 text-xs text-slate-400 font-mono italic">#{order.id.toString().slice(-6)}</div>
                                 <div className="text-lg font-black text-slate-800 mr-4">${order.total}</div>
                                 <ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} />
                               </div>
                               {isOrderExpand && (
-                                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+                                <div className="px-10 py-4 bg-slate-50 border-t border-slate-100 text-slate-900">
                                   <div className="space-y-1">
                                     {(order.items || []).map((item, idx) => (
-                                      <div key={idx} className="flex justify-between text-xs">
-                                        <span className="text-slate-500">{item.name}</span>
-                                        <span className="font-bold text-slate-700">${item.price}</span>
+                                      <div key={idx} className="flex justify-between text-sm">
+                                        <span className="text-slate-500 font-medium">{item.name} x {item.quantity || 1}</span>
+                                        <span className="font-bold text-slate-700">${item.price * (item.quantity || 1)}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -414,7 +408,6 @@ const DashboardPage = () => {
                             </div>
                           );
                         })}
-                        {summaryOrders.length === 0 && <div className="text-slate-400 text-sm italic">找不對對應的原始訂單明細</div>}
                       </div>
                     </div>
                   </div>
@@ -422,24 +415,18 @@ const DashboardPage = () => {
               </div>
             );
           })}
-          {dailySummaries.length === 0 && <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-300">尚未有日結報表紀錄</div>}
         </div>
       ) : (
         <div className="space-y-3">
-          <h3 className="text-slate-400 font-bold text-xs uppercase tracking-widest px-2">全部歷史交易清單</h3>
           {[...orders].reverse().map(order => {
             const isExpand = expandOrderId === order.id;
             return (
               <div key={order.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm transition-all ${order.status === 'closed' ? 'border-slate-100 opacity-70' : 'border-blue-200 shadow-blue-50'}`}>
                 <div onClick={() => setExpandOrderId(isExpand ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
                   <div className="flex-1">
-                    <div className="font-bold text-slate-700 flex items-center">
+                    <div className="font-bold text-slate-700 flex items-center text-slate-900">
                       {order.date} {order.time}
-                      {order.status === 'closed' ? (
-                        <span className="ml-2 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal italic">已結算</span>
-                      ) : (
-                        <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-normal italic">未結算</span>
-                      )}
+                      {order.status === 'closed' ? <span className="ml-2 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-normal italic">已結算</span> : <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-normal italic">未結算</span>}
                     </div>
                     <div className="text-xs text-slate-400 font-mono italic">#{order.id}</div>
                   </div>
@@ -447,17 +434,17 @@ const DashboardPage = () => {
                   <ChevronRight className={`text-slate-300 transition-transform ${isExpand ? 'rotate-90' : ''}`} />
                 </div>
                 {isExpand && (
-                  <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in">
-                    <div className="space-y-2 text-slate-900">
+                  <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 text-slate-900 animate-in fade-in">
+                    <div className="space-y-2">
                       {(order.items || []).map((item, idx) => (
                         <div key={idx} className="flex justify-between text-sm">
-                          <span className="text-slate-600 font-medium">{item.name}</span>
-                          <span className="font-bold text-slate-800">${item.price}</span>
+                          <span className="text-slate-600 font-medium">{item.name} x {item.quantity || 1}</span>
+                          <span className="font-bold text-slate-800">${item.price * (item.quantity || 1)}</span>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between font-black text-slate-900">
-                      <span>單筆總額</span>
+                    <div className="mt-4 pt-4 border-t flex justify-between font-black">
+                      <span>總額</span>
                       <span>${order.total}</span>
                     </div>
                   </div>
@@ -471,7 +458,7 @@ const DashboardPage = () => {
   );
 };
 
-// --- 7. 主架構與導向 ---
+// --- 7. 主架構 ---
 const MainLayout = () => (
   <div className="flex min-h-screen bg-slate-50">
     <Sidebar />
