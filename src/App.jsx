@@ -19,7 +19,8 @@ import {
   TrendingUp,
   Receipt,
   Utensils,
-  ShoppingBag
+  ShoppingBag,
+  Clock
 } from 'lucide-react';
 
 // --- 1. 全域資料管理中心 (Context) ---
@@ -65,14 +66,14 @@ const Sidebar = () => {
 
   return (
     <div className="w-64 h-screen bg-slate-900 text-white fixed left-0 top-0 flex flex-col">
-      <div className="p-8 flex items-center space-x-3">
+      <div className="p-8 flex items-center space-x-3 border-b border-slate-800">
         <div className="bg-blue-600 p-2 rounded-lg text-white">
           <Store size={24} />
         </div>
         <span className="text-xl font-black tracking-tight text-white uppercase">Smart POS</span>
       </div>
 
-      <div className="flex-1 px-4 space-y-2">
+      <div className="flex-1 px-4 space-y-2 mt-6">
         {navItems.map(item => (
           <Link
             key={item.path}
@@ -138,11 +139,11 @@ const LoginPage = () => {
   );
 };
 
-// --- 4. 前台收銀 ---
+// --- 4. 前台收銀 (優化連續結帳流程) ---
 const POSPage = () => {
   const { menu, setOrders, orders } = useContext(POSContext);
   const [cart, setCart] = useState([]);
-  const [orderType, setOrderType] = useState('dineIn'); // 'dineIn' 或 'takeOut'
+  const [orderType, setOrderType] = useState('dineIn');
 
   const addToCart = (product) => {
     setCart(prevCart => {
@@ -170,33 +171,72 @@ const POSPage = () => {
 
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+  // 計算今天的取餐序號
+  const todayStr = new Date().toLocaleDateString();
+  const todayOrderCount = orders.filter(o => o.date === todayStr).length;
+
   const checkout = () => {
     if (cart.length === 0) return;
+
+    const orderNo = (todayOrderCount + 1).toString().padStart(3, '0');
     const newOrder = {
       id: Date.now(),
+      orderNo, // 加入取餐號
       total,
-      date: new Date().toLocaleDateString(),
+      date: todayStr,
       time: new Date().toLocaleTimeString(),
       items: [...cart],
       orderType,
       status: 'unclosed'
     };
+
     setOrders([...orders, newOrder]);
     setCart([]);
-    alert(`結帳成功！(${orderType === 'dineIn' ? '內用' : '外帶'})`);
+    setOrderType('dineIn'); // 結帳後重置回內用
+    alert(`結帳成功！取餐號：${orderNo} (${orderType === 'dineIn' ? '內用' : '外帶'})`);
   };
 
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       <div className="flex-1 text-slate-900">
-        <h2 className="text-2xl font-bold mb-6">點餐區</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 text-slate-900">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">點餐區</h2>
+          <div className="bg-slate-100 px-4 py-2 rounded-lg text-sm text-slate-500 font-medium">
+            下一個取餐號: <span className="text-blue-600 font-bold">#{(todayOrderCount + 1).toString().padStart(3, '0')}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 mb-10">
           {menu.map(item => (
             <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group">
               <div className="text-slate-800 font-bold mb-1 group-hover:text-blue-600 truncate">{item.name}</div>
               <div className="text-blue-600 font-black text-xl">${item.price}</div>
             </button>
           ))}
+        </div>
+
+        {/* 新增：近期訂單區塊 (讓收銀員知道上一筆有沒有結帳成功) */}
+        <div className="mt-auto border-t border-slate-200 pt-8">
+          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+            <Clock size={16} className="mr-2" /> 近期完成訂單 (今日共 {todayOrderCount} 筆)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...orders].filter(o => o.date === todayStr).slice(-3).reverse().map(o => (
+              <div key={o.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-xs">
+                <div className="flex justify-between mb-2">
+                  <span className="font-bold text-slate-700">號碼 #{o.orderNo}</span>
+                  <span className="text-slate-400">{o.time}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className={`px-2 py-0.5 rounded font-bold ${o.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                    {o.orderType === 'takeOut' ? '外帶' : '內用'}
+                  </span>
+                  <span className="font-black text-slate-800 text-base">${o.total}</span>
+                </div>
+              </div>
+            ))}
+            {todayOrderCount === 0 && <div className="text-slate-300 italic text-sm">今日尚無訂單</div>}
+          </div>
         </div>
       </div>
 
@@ -235,7 +275,7 @@ const POSPage = () => {
               <div className="flex justify-between items-center mt-3">
                 <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-lg overflow-hidden">
                   <button onClick={() => updateQuantity(item.id, -1)} className="p-2 hover:bg-slate-100 text-slate-500"><Minus size={14} /></button>
-                  <span className="w-10 text-center font-bold text-sm">{item.quantity}</span>
+                  <span className="w-10 text-center font-bold text-sm text-slate-900">{item.quantity}</span>
                   <button onClick={() => updateQuantity(item.id, 1)} className="p-2 hover:bg-slate-100 text-slate-500"><Plus size={14} /></button>
                 </div>
                 <button onClick={() => updateQuantity(item.id, -999)} className="text-red-400 hover:text-red-600 p-2">
@@ -245,8 +285,8 @@ const POSPage = () => {
             </div>
           ))}
           {cart.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-slate-300">
-              <ShoppingCart size={48} className="mb-2 opacity-20" />
+            <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-60">
+              <ShoppingCart size={48} className="mb-2" />
               <p>尚未點餐</p>
             </div>
           )}
@@ -254,7 +294,7 @@ const POSPage = () => {
 
         <div className="p-6 bg-slate-900 text-white rounded-b-3xl">
           <div className="flex justify-between items-center mb-6">
-            <span className="text-slate-400 font-medium text-white/60">總計</span>
+            <span className="text-slate-400 font-medium">總計金額</span>
             <span className="text-3xl font-black text-white">${total}</span>
           </div>
           <button
@@ -262,7 +302,7 @@ const POSPage = () => {
             disabled={cart.length === 0}
             className="w-full bg-blue-600 py-4 rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-900/20"
           >
-            確認結帳
+            完成結帳 (取餐號)
           </button>
         </div>
       </div>
@@ -285,7 +325,7 @@ const AdminPage = () => {
 
   return (
     <div className="max-w-4xl text-slate-900">
-      <h2 className="text-2xl font-bold mb-8 text-slate-900">菜單管理中心</h2>
+      <h2 className="text-2xl font-bold mb-8">菜單管理中心</h2>
       <form onSubmit={handleAdd} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col sm:flex-row gap-4 mb-8">
         <div className="flex-1">
           <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">商品名稱</label>
@@ -297,11 +337,11 @@ const AdminPage = () => {
         </div>
         <button type="submit" className="bg-slate-900 text-white px-8 h-12 self-end rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg"><Plus size={20} className="mr-1" /> 新增</button>
       </form>
-      <div className="grid gap-3 text-slate-900">
+      <div className="grid gap-3">
         {menu.map(item => (
           <div key={item.id} className="bg-white px-8 py-5 rounded-2xl border border-slate-50 flex justify-between items-center shadow-sm">
             <span className="font-bold text-slate-700">{item.name}</span>
-            <div className="flex items-center space-x-10 text-slate-900">
+            <div className="flex items-center space-x-10">
               <span className="text-blue-600 font-black text-xl">${item.price}</span>
               <button onClick={() => setMenu(menu.filter(m => m.id !== item.id))} className="text-slate-200 hover:text-red-500"><Trash2 size={20} /></button>
             </div>
@@ -312,7 +352,7 @@ const AdminPage = () => {
   );
 };
 
-// --- 6. 報表分析 ---
+// --- 6. 報表分析 (含明細價格修復) ---
 const DashboardPage = () => {
   const { orders, setOrders, dailySummaries, setDailySummaries } = useContext(POSContext);
   const [expandOrderId, setExpandOrderId] = useState(null);
@@ -365,13 +405,12 @@ const DashboardPage = () => {
     alert("日結作業完成！");
   };
 
-  // 渲染訂單中的品項明細 (共用函式)
   const renderItemDetails = (items) => {
     return (items || []).map((item, idx) => {
       const qty = item.quantity || 1;
       const price = item.price || 0;
       return (
-        <div key={idx} className="flex justify-between items-center py-1 border-b border-slate-100 last:border-0">
+        <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
           <div className="flex flex-col">
             <span className="text-slate-700 font-medium text-sm">{item.name}</span>
             <span className="text-[10px] text-slate-400 font-mono">
@@ -437,7 +476,7 @@ const DashboardPage = () => {
                 {isExpand && (
                   <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 animate-in fade-in space-y-8 text-slate-900">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900">
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                         <h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center"><TrendingUp size={14} className="mr-2 text-blue-500" /> 銷量統計</h4>
                         <div className="space-y-2">
                           {Object.entries(summary.itemSales || {}).map(([name, count]) => (
@@ -448,7 +487,7 @@ const DashboardPage = () => {
                           ))}
                         </div>
                       </div>
-                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900">
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                         <h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center"><Utensils size={14} className="mr-2 text-orange-500" /> 內外帶比例</h4>
                         <div className="space-y-4">
                           <div className="flex justify-between items-center">
@@ -461,7 +500,7 @@ const DashboardPage = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center text-slate-900">
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
                         <span className="text-xs text-slate-400 uppercase font-bold block mb-1">平均客單價</span>
                         <span className="text-3xl font-black text-slate-800">${summary.orderCount > 0 ? (summary.total / summary.orderCount).toFixed(0) : 0}</span>
                         <span className="text-xs text-slate-400 mt-2 italic">共計 {summary.orderCount} 筆交易</span>
@@ -469,14 +508,17 @@ const DashboardPage = () => {
                     </div>
 
                     <div className="border-t border-slate-200 pt-8">
-                      <h4 className="text-sm font-bold text-slate-500 mb-4 flex items-center text-slate-900"><Receipt size={16} className="mr-2 text-blue-500" /> 原始訂單清單</h4>
-                      <div className="space-y-2 text-slate-900">
+                      <h4 className="text-sm font-bold text-slate-500 mb-4 flex items-center text-slate-900"><Receipt size={16} className="mr-2 text-blue-500" /> 原始訂單明細</h4>
+                      <div className="space-y-2">
                         {summaryOrders.map((order) => {
                           const isOrderExpand = expandOrderId === order.id;
                           return (
-                            <div key={order.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm text-slate-900">
+                            <div key={order.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                               <div onClick={(e) => { e.stopPropagation(); setExpandOrderId(isOrderExpand ? null : order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors">
-                                <div className="flex-1 text-sm font-bold text-slate-600">{order.time}</div>
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-sm font-bold text-slate-700">號碼 #{order.orderNo || 'N/A'}</span>
+                                  <span className="text-[10px] text-slate-400">{order.time}</span>
+                                </div>
                                 <div className="flex-1">
                                   {order.orderType === 'takeOut' ?
                                     <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold">外帶</span> :
@@ -496,7 +538,6 @@ const DashboardPage = () => {
                             </div>
                           );
                         })}
-                        {summaryOrders.length === 0 && <div className="text-center py-4 text-slate-300 italic">找不到對應的原始訂單數據</div>}
                       </div>
                     </div>
                   </div>
@@ -515,12 +556,12 @@ const DashboardPage = () => {
                 <div onClick={() => setExpandOrderId(isExpand ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 text-slate-900 transition-colors">
                   <div className="flex-1">
                     <div className="font-bold text-slate-700 flex items-center">
-                      {order.date} {order.time}
+                      #{order.orderNo || 'N/A'} - {order.date} {order.time}
                       <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
                         {order.orderType === 'takeOut' ? '外帶' : '內用'}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400 font-mono italic">#{order.id}</div>
+                    <div className="text-xs text-slate-400 font-mono italic">ID: {order.id}</div>
                   </div>
                   <div className="text-xl font-black text-blue-600 mr-6">${order.total}</div>
                   <ChevronRight className={`text-slate-300 transition-transform ${isExpand ? 'rotate-90' : ''}`} />
