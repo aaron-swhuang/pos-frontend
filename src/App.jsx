@@ -232,7 +232,7 @@ const POSPage = () => {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 shrink-0">
           <div className="flex items-center space-x-4">
-            <h2 className="text-2xl font-bold">點餐區</h2>
+            <h2 className="text-2xl font-bold text-slate-900">點餐區</h2>
             <div className="bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 flex items-center">
               <span className="text-[10px] font-black text-blue-400 uppercase tracking-tighter mr-2">Next No.</span>
               <span className="text-blue-600 font-black text-lg font-mono">#{(todayOrderCount + 1).toString().padStart(3, '0')}</span>
@@ -263,14 +263,15 @@ const POSPage = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10 scrollbar-thin">
+        {/* 關鍵修正：加入 content-start 防止少數品項時按鈕垂直拉長 */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10 scrollbar-thin content-start">
           {filteredMenu.map(item => (
-            <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group">
+            <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group h-fit">
               <div className="text-slate-800 font-bold mb-1 group-hover:text-blue-600 truncate">{item.name}</div>
               <div className="text-blue-600 font-black text-xl">${item.price}</div>
             </button>
           ))}
-          {filteredMenu.length === 0 && <div className="col-span-full py-20 text-center text-slate-300 italic font-medium">找不到商品</div>}
+          {filteredMenu.length === 0 && <div className="col-span-full py-20 text-center text-slate-300 italic font-medium">找不到符合搜尋條件的商品</div>}
         </div>
       </div>
 
@@ -283,7 +284,7 @@ const POSPage = () => {
           </div>
           <div className="grid grid-cols-2 gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-inner">
             <button onClick={() => setOrderType('dineIn')} className={`flex items-center justify-center space-x-2 py-2 rounded-lg text-sm font-bold transition-all ${orderType === 'dineIn' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}><Utensils size={16} /><span>內用</span></button>
-            <button onClick={() => setOrderType('takeOut')} className={`flex items-center justify-center space-x-2 py-2 rounded-lg text-sm font-bold transition-all ${orderType === 'takeOut' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}><ShoppingBag size={16} /><span>外帶</span></button>
+            <button onClick={() => setOrderType('takeOut')} className={`flex items-center justify-center space-x-2 py-2 rounded-lg text-sm font-bold transition-all ${orderType === 'takeOut' ? 'bg-slate-900 text-white shadow-md text-white' : 'text-slate-400 hover:bg-slate-50'}`}><ShoppingBag size={16} /><span>外帶</span></button>
           </div>
         </div>
 
@@ -360,7 +361,7 @@ const OrderManagementPage = () => {
     <div className="max-w-6xl text-slate-900 h-full flex flex-col overflow-hidden">
       <div className="flex justify-between items-end mb-8 shrink-0">
         <div>
-          <h2 className="text-2xl font-bold">訂單管理</h2>
+          <h2 className="text-2xl font-bold text-slate-900">訂單管理</h2>
           <p className="text-slate-400 text-sm">追蹤待結帳單與今日交易狀況</p>
         </div>
         <div className="flex space-x-4">
@@ -476,8 +477,6 @@ const AdminPage = () => {
   return (
     <div className="max-w-4xl text-slate-900 h-full flex flex-col overflow-hidden">
       <h2 className="text-2xl font-bold mb-8 shrink-0">菜單設計維護</h2>
-
-      {/* 修正按鈕樣式與字樣顯示 */}
       <form onSubmit={handleSubmit} className={`bg-white p-8 rounded-3xl shadow-sm border transition-all mb-8 shrink-0 ${editingId ? 'border-amber-400 ring-4 ring-amber-50' : 'border-slate-100'}`}>
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
           <div className="sm:col-span-5"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">商品名稱</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-900" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} /></div>
@@ -485,7 +484,6 @@ const AdminPage = () => {
           <div className="sm:col-span-2"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">價格</label><input type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-900" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} /></div>
 
           <div className="sm:col-span-2 flex items-end gap-2">
-            {/* 關鍵修正：加入文字 span 與 flex 對齊 */}
             <button type="submit" className={`flex-1 rounded-xl font-bold h-12 text-white transition-all flex items-center justify-center gap-2 shadow-lg ${editingId ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-900 hover:bg-slate-800'}`}>
               {editingId ? <Edit2 size={18} /> : <Plus size={20} />}
               <span>{editingId ? '更新' : '新增'}</span>
@@ -502,7 +500,7 @@ const AdminPage = () => {
       <div className="grid gap-3 overflow-y-auto flex-1 pr-2 pb-10 scrollbar-thin text-slate-900">
         {menu.map(item => (
           <div key={item.id} className="bg-white px-8 py-5 rounded-2xl border border-slate-50 flex justify-between items-center shadow-sm shrink-0">
-            <div className="flex items-center space-x-4"><div className="bg-slate-100 p-2 rounded-lg text-slate-400"><Tag size={16} /></div><div><div className="font-bold text-slate-700">{item.name}</div><div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.category}</div></div></div>
+            <div className="flex items-center space-x-4"><div className="bg-slate-100 p-2 rounded-lg text-slate-400"><Tag size={16} /></div><div><div className="font-bold text-slate-700 text-slate-900">{item.name}</div><div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.category}</div></div></div>
             <div className="flex items-center space-x-6 text-slate-900">
               <span className="text-blue-600 font-black text-xl">${item.price}</span>
               <div className="flex space-x-2 border-l pl-6 border-slate-100">
@@ -556,7 +554,7 @@ const DashboardPage = () => {
 
   const renderItemDetails = (items) => (items || []).map((item, idx) => (
     <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0 text-slate-900">
-      <div className="flex flex-col"><span className="text-slate-700 font-medium text-sm">{item.name}</span><span className="text-[10px] text-slate-400 font-mono italic">單價 ${item.price} x {item.quantity || 1}</span></div>
+      <div className="flex flex-col text-slate-900"><span className="text-slate-700 font-medium text-sm">{item.name}</span><span className="text-[10px] text-slate-400 font-mono italic">單價 ${item.price} x {item.quantity || 1}</span></div>
       <span className="font-bold text-sm text-slate-900">${(item.price || 0) * (item.quantity || 1)}</span>
     </div>
   ));
@@ -594,7 +592,7 @@ const DashboardPage = () => {
                   {isExpand && (
                     <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 animate-in fade-in space-y-8 text-slate-900">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-900">
-                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900"><h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center text-slate-900 text-slate-900"><TrendingUp size={14} className="mr-2 text-blue-500 text-blue-500" /> 銷量統計</h4><div className="space-y-2 text-slate-900">{Object.entries(summary.itemSales || {}).map(([name, count]) => (<div key={name} className="flex justify-between items-center text-sm text-slate-900"><span className="text-slate-600">{name}</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{count}</span></div>))}</div></div>
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900"><h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center text-slate-900"><TrendingUp size={14} className="mr-2 text-blue-500 text-blue-500" /> 銷量統計</h4><div className="space-y-2 text-slate-900">{Object.entries(summary.itemSales || {}).map(([name, count]) => (<div key={name} className="flex justify-between items-center text-sm text-slate-900"><span className="text-slate-600">{name}</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{count}</span></div>))}</div></div>
                         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900"><h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center text-orange-500"><Utensils size={14} className="mr-2 text-orange-500" /> 內外帶比例</h4><div className="space-y-4 text-slate-900"><div className="flex justify-between items-center text-slate-900"><span className="text-sm text-slate-600 font-bold">內用筆數</span><span className="font-black text-blue-600">{summary.typeCount?.dineIn || 0}</span></div><div className="flex justify-between items-center text-slate-900"><span className="text-sm text-slate-600 font-bold">外帶筆數</span><span className="font-black text-orange-600">{summary.typeCount?.takeOut || 0}</span></div></div></div>
                         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center text-slate-900"><span className="text-xs text-slate-400 uppercase font-bold block mb-1">平均客單價</span><span className="text-3xl font-black">${summary.orderCount > 0 ? (summary.total / summary.orderCount).toFixed(0) : 0}</span><span className="text-xs text-slate-400 mt-2 italic text-slate-400">共計 {summary.orderCount} 筆交易</span></div>
                       </div>
@@ -637,9 +635,9 @@ const SettingsPage = () => {
   return (
     <div className="max-w-2xl text-slate-900 h-full overflow-hidden">
       <h2 className="text-2xl font-bold mb-8 text-slate-900 text-slate-900">系統參數設定</h2>
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden text-slate-900">
         <div className="p-8 space-y-8 text-slate-900">
-          <section><label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block text-slate-400">店舖名稱</label><input type="text" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-lg text-slate-900 text-slate-900" value={config.storeName} onChange={(e) => updateConfig('storeName', e.target.value)} /></section>
+          <section><label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block text-slate-400">店舖名稱</label><input type="text" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-lg text-slate-900" value={config.storeName} onChange={(e) => updateConfig('storeName', e.target.value)} /></section>
           <hr className="border-slate-100" />
           <section>
             <div className="flex justify-between items-center mb-4 text-slate-900">
@@ -649,7 +647,7 @@ const SettingsPage = () => {
             <div className={`p-4 rounded-2xl flex items-start space-x-3 ${config.dineInMode === 'prePay' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>{config.dineInMode === 'prePay' ? <CheckCircle2 size={20} className="shrink-0 mt-0.5 text-blue-700" /> : <Clock size={20} className="shrink-0 mt-0.5 text-amber-700 text-amber-700" />}<p className="text-xs leading-relaxed font-medium">{config.dineInMode === 'prePay' ? "模式：【先結帳】。點餐後需立即收款。" : "模式：【後結帳】。點餐後進入「訂單管理」，離開前收款。"}</p></div>
           </section>
         </div>
-        <div className="bg-slate-50 p-6 border-t border-slate-100 text-center"><p className="text-xs text-slate-400 flex items-center justify-center text-slate-400 text-slate-400"><Sliders size={14} className="mr-2 text-slate-400" /> 設定立即生效</p></div>
+        <div className="bg-slate-50 p-6 border-t border-slate-100 text-center"><p className="text-xs text-slate-400 flex items-center justify-center text-slate-400"><Sliders size={14} className="mr-2 text-slate-400" /> 設定立即生效</p></div>
       </div>
     </div>
   );
