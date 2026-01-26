@@ -77,7 +77,7 @@ const Sidebar = () => {
 
   const navItems = [
     { path: '/pos', label: '櫃檯收銀', icon: <ShoppingCart size={20} /> },
-    { path: '/orders', label: '訂單管理', icon: <ClipboardList size={20} /> }, // 新增入口
+    { path: '/orders', label: '訂單管理', icon: <ClipboardList size={20} /> },
     { path: '/admin', label: '菜單設計', icon: <Edit2 size={20} /> },
     { path: '/dashboard', label: '報表分析', icon: <LayoutDashboard size={20} /> },
     { path: '/settings', label: '系統設定', icon: <Settings size={20} /> },
@@ -158,7 +158,7 @@ const LoginPage = () => {
   );
 };
 
-// --- 4. 前台收銀 (純點餐排版) ---
+// --- 4. 前台收銀 ---
 const POSPage = () => {
   const { menu, setOrders, orders, config } = useContext(POSContext);
   const [cart, setCart] = useState([]);
@@ -263,7 +263,6 @@ const POSPage = () => {
           ))}
         </div>
 
-        {/* 商品網格 - 現在擁有完整空間 */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10">
           {filteredMenu.map(item => (
             <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-blue-500 hover:shadow-md transition-all text-left group">
@@ -288,7 +287,7 @@ const POSPage = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 text-slate-900">
           {cart.map(item => (
             <div key={item.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-slate-900">
               <div className="flex justify-between items-start mb-2">
@@ -327,18 +326,36 @@ const POSPage = () => {
   );
 };
 
-// --- 5. 訂單管理頁面 (全新頁面) ---
+// --- 5. 訂單管理頁面 ---
 const OrderManagementPage = () => {
   const { orders, setOrders } = useContext(POSContext);
+  const [expandedOrderId, setExpandedOrderId] = useState(null); // 新增展開狀態
   const todayStr = new Date().toLocaleDateString();
 
   const pendingOrders = orders.filter(o => o.paymentStatus === 'pending');
   const finishedOrders = orders.filter(o => o.paymentStatus === 'paid' && o.date === todayStr);
 
-  const handlePay = (id) => {
+  const handlePay = (e, id) => {
+    e.stopPropagation(); // 防止觸發展開
     if (!window.confirm("確定完成此訂單結帳？")) return;
     setOrders(orders.map(o => o.id === id ? { ...o, paymentStatus: 'paid' } : o));
   };
+
+  const toggleExpand = (id) => {
+    setExpandedOrderId(expandedOrderId === id ? null : id);
+  };
+
+  // 品項明細渲染邏輯
+  const renderItems = (items) => (
+    <div className="space-y-1 mt-4 pt-4 border-t border-slate-100">
+      {(items || []).map((item, idx) => (
+        <div key={idx} className="flex justify-between items-center text-xs">
+          <span className="text-slate-500 font-medium">{item.name} x {item.quantity || 1}</span>
+          <span className="font-bold text-slate-700">${(item.price || 0) * (item.quantity || 1)}</span>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="max-w-6xl text-slate-900 h-[calc(100vh-80px)] flex flex-col">
@@ -367,26 +384,34 @@ const OrderManagementPage = () => {
           </h3>
           <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
             {pendingOrders.map(o => (
-              <div key={o.id} className="bg-white p-5 rounded-3xl border border-amber-200 shadow-sm hover:shadow-md transition-all flex justify-between items-center">
-                <div>
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-lg font-black text-slate-800">#{o.orderNo}</span>
-                    <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold">內用後結</span>
+              <div
+                key={o.id}
+                onClick={() => toggleExpand(o.id)}
+                className={`bg-white p-5 rounded-3xl border transition-all cursor-pointer hover:shadow-md ${expandedOrderId === o.id ? 'border-amber-400 shadow-md' : 'border-amber-200 shadow-sm'}`}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="text-lg font-black text-slate-800">#{o.orderNo}</span>
+                      <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold">內用後結</span>
+                    </div>
+                    <div className="text-xs text-slate-400 flex items-center"><Clock size={12} className="mr-1" /> {o.time}</div>
                   </div>
-                  <div className="text-xs text-slate-400 flex items-center"><Clock size={12} className="mr-1" /> {o.time}</div>
-                </div>
-                <div className="flex items-center space-x-6">
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">應收</p>
-                    <p className="text-xl font-black text-slate-900">${o.total}</p>
+                  <div className="flex items-center space-x-6 text-slate-900">
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">應收</p>
+                      <p className="text-xl font-black text-slate-900">${o.total}</p>
+                    </div>
+                    <button
+                      onClick={(e) => handlePay(e, o.id)}
+                      className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-600 transition-all flex items-center"
+                    >
+                      <Wallet size={18} className="mr-2" /> 結帳
+                    </button>
+                    {expandedOrderId === o.id ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}
                   </div>
-                  <button
-                    onClick={() => handlePay(o.id)}
-                    className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-600 transition-all flex items-center"
-                  >
-                    <Wallet size={18} className="mr-2" /> 結帳
-                  </button>
                 </div>
+                {expandedOrderId === o.id && renderItems(o.items)}
               </div>
             ))}
             {pendingOrders.length === 0 && <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl py-20 text-center text-slate-300 italic font-medium">目前暫無待結訂單</div>}
@@ -400,20 +425,30 @@ const OrderManagementPage = () => {
           </h3>
           <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
             {[...finishedOrders].reverse().map(o => (
-              <div key={o.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center opacity-70 hover:opacity-100 transition-all">
-                <div className="flex items-center space-x-4">
-                  <div className={`p-2 rounded-lg ${o.orderType === 'takeOut' ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-500'}`}>
-                    {o.orderType === 'takeOut' ? <ShoppingBag size={20} /> : <Utensils size={20} />}
+              <div
+                key={o.id}
+                onClick={() => toggleExpand(o.id)}
+                className={`bg-white p-4 rounded-2xl border transition-all cursor-pointer opacity-80 hover:opacity-100 ${expandedOrderId === o.id ? 'border-blue-400 shadow-md' : 'border-slate-100 shadow-sm'}`}
+              >
+                <div className="flex justify-between items-center text-slate-900">
+                  <div className="flex items-center space-x-4">
+                    <div className={`p-2 rounded-lg ${o.orderType === 'takeOut' ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-500'}`}>
+                      {o.orderType === 'takeOut' ? <ShoppingBag size={20} /> : <Utensils size={20} />}
+                    </div>
+                    <div>
+                      <div className="font-black text-slate-700 text-sm">#{o.orderNo}</div>
+                      <div className="text-[10px] text-slate-400">{o.time}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-black text-slate-700 text-sm">#{o.orderNo}</div>
-                    <div className="text-[10px] text-slate-400">{o.time}</div>
+                  <div className="flex items-center space-x-6">
+                    <div className="text-right">
+                      <div className="text-lg font-black text-slate-800">${o.total}</div>
+                      <div className="text-[10px] font-bold text-green-500 uppercase flex items-center justify-end"><CheckCircle2 size={10} className="mr-1" /> 已付款</div>
+                    </div>
+                    {expandedOrderId === o.id ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-black text-slate-800">${o.total}</div>
-                  <div className="text-[10px] font-bold text-green-500 uppercase flex items-center justify-end"><CheckCircle2 size={10} className="mr-1" /> 已付款</div>
-                </div>
+                {expandedOrderId === o.id && renderItems(o.items)}
               </div>
             ))}
           </div>
@@ -449,7 +484,7 @@ const AdminPage = () => {
           <div className="sm:col-span-5"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">商品名稱</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-900" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} /></div>
           <div className="sm:col-span-3"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">分類</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-900" value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} /></div>
           <div className="sm:col-span-2"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">價格</label><input type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-900" value={newItem.price} onChange={e => setNewItem({ ...newItem, price: e.target.value })} /></div>
-          <div className="sm:col-span-2 flex items-end gap-2 text-white">
+          <div className="sm:col-span-2 flex items-end gap-2 text-white text-slate-900">
             <button type="submit" className={`flex-1 rounded-xl font-bold h-12 text-white transition-all ${editingId ? 'bg-amber-500' : 'bg-slate-900'}`}>{editingId ? <Edit2 size={18} /> : <Plus size={20} />}</button>
             {editingId && <button type="button" onClick={() => { setEditingId(null); setNewItem({ name: '', price: '', category: '' }) }} className="bg-slate-100 p-3 rounded-xl text-slate-400"><X size={20} /></button>}
           </div>
@@ -457,10 +492,10 @@ const AdminPage = () => {
       </form>
       <div className="grid gap-3">
         {menu.map(item => (
-          <div key={item.id} className="bg-white px-8 py-5 rounded-2xl border border-slate-50 flex justify-between items-center shadow-sm">
+          <div key={item.id} className="bg-white px-8 py-5 rounded-2xl border border-slate-50 flex justify-between items-center shadow-sm text-slate-900">
             <div className="flex items-center space-x-4"><div className="bg-slate-100 p-2 rounded-lg text-slate-400"><Tag size={16} /></div><div><div className="font-bold text-slate-700">{item.name}</div><div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.category}</div></div></div>
             <div className="flex items-center space-x-6 text-slate-900"><span className="text-blue-600 font-black text-xl">${item.price}</span>
-              <div className="flex space-x-2 border-l pl-6 border-slate-100">
+              <div className="flex space-x-2 border-l pl-6 border-slate-100 text-slate-900">
                 <button onClick={() => { setEditingId(item.id); setNewItem({ name: item.name, price: item.price.toString(), category: item.category }) }} className="text-slate-300 hover:text-amber-500 p-2"><Edit2 size={18} /></button>
                 <button onClick={() => setMenu(menu.filter(m => m.id !== item.id))} className="text-slate-300 hover:text-red-500 p-2"><Trash2 size={20} /></button>
               </div>
@@ -512,7 +547,7 @@ const DashboardPage = () => {
   const renderItemDetails = (items) => (items || []).map((item, idx) => (
     <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0 text-slate-900">
       <div className="flex flex-col text-slate-900"><span className="text-slate-700 font-medium text-sm">{item.name}</span><span className="text-[10px] text-slate-400 font-mono italic">單價 ${item.price} x {item.quantity || 1}</span></div>
-      <span className="font-bold text-sm text-slate-900">${item.price * (item.quantity || 1)}</span>
+      <span className="font-bold text-sm text-slate-900">${(item.price || 0) * (item.quantity || 1)}</span>
     </div>
   ));
 
@@ -520,10 +555,10 @@ const DashboardPage = () => {
     <div className="max-w-5xl text-slate-900">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 text-slate-900">
         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-3xl text-white shadow-xl flex flex-col justify-between min-h-[220px]">
-          <div><p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2 text-white/80">今日營收 (已結帳)</p><h3 className="text-5xl font-black text-white">${todayRevenue}</h3></div>
+          <div><p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2 text-white/80 text-white">今日營收 (已結帳)</p><h3 className="text-5xl font-black text-white">${todayRevenue}</h3></div>
           <button onClick={handleDailyClosing} className="mt-6 flex items-center justify-center space-x-2 bg-white/20 hover:bg-white/30 px-6 py-3 rounded-xl font-bold border border-white/30 text-white"><CalendarCheck size={20} /><span>執行日結結帳</span></button>
         </div>
-        <div className="bg-white p-10 rounded-3xl border border-slate-100 flex flex-col justify-center shadow-sm">
+        <div className="bg-white p-10 rounded-3xl border border-slate-100 flex flex-col justify-center shadow-sm text-slate-900">
           <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2 text-slate-400">今日待結筆數</p>
           <h3 className="text-5xl font-black text-slate-800">{orders.filter(o => o.paymentStatus === 'pending').length} <span className="text-xl font-normal text-slate-300">筆</span></h3>
         </div>
@@ -547,12 +582,12 @@ const DashboardPage = () => {
                 </div>
                 {isExpand && (
                   <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 animate-in fade-in space-y-8 text-slate-900">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-900 text-slate-900">
-                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900 text-slate-900"><h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center text-slate-900 text-slate-900"><TrendingUp size={14} className="mr-2 text-blue-500" /> 銷量統計</h4><div className="space-y-2 text-slate-900 text-slate-900 text-slate-900">{Object.entries(summary.itemSales || {}).map(([name, count]) => (<div key={name} className="flex justify-between items-center text-sm text-slate-900 text-slate-900 text-slate-900"><span className="text-slate-600">{name}</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{count}</span></div>))}</div></div>
-                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900 text-slate-900"><h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center text-orange-500"><Utensils size={14} className="mr-2" /> 內外帶比例</h4><div className="space-y-4 text-slate-900 text-slate-900 text-slate-900"><div className="flex justify-between items-center text-slate-900 text-slate-900 text-slate-900 text-slate-900"><span className="text-sm text-slate-600 font-bold">內用筆數</span><span className="font-black text-blue-600">{summary.typeCount?.dineIn || 0}</span></div><div className="flex justify-between items-center text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><span className="text-sm text-slate-600 font-bold">外帶筆數</span><span className="font-black text-orange-600">{summary.typeCount?.takeOut || 0}</span></div></div></div>
-                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><span className="text-xs text-slate-400 uppercase font-bold block mb-1">平均客單價</span><span className="text-3xl font-black">${summary.orderCount > 0 ? (summary.total / summary.orderCount).toFixed(0) : 0}</span><span className="text-xs text-slate-400 mt-2 italic">共計 {summary.orderCount} 筆交易</span></div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-900">
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900"><h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center text-slate-900"><TrendingUp size={14} className="mr-2 text-blue-500" /> 銷量統計</h4><div className="space-y-2 text-slate-900">{Object.entries(summary.itemSales || {}).map(([name, count]) => (<div key={name} className="flex justify-between items-center text-sm text-slate-900 text-slate-900"><span className="text-slate-600">{name}</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{count}</span></div>))}</div></div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-slate-900"><h4 className="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center text-orange-500"><Utensils size={14} className="mr-2" /> 內外帶比例</h4><div className="space-y-4 text-slate-900"><div className="flex justify-between items-center text-slate-900"><span className="text-sm text-slate-600 font-bold">內用筆數</span><span className="font-black text-blue-600">{summary.typeCount?.dineIn || 0}</span></div><div className="flex justify-between items-center text-slate-900 text-slate-900"><span className="text-sm text-slate-600 font-bold">外帶筆數</span><span className="font-black text-orange-600">{summary.typeCount?.takeOut || 0}</span></div></div></div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center text-slate-900"><span className="text-xs text-slate-400 uppercase font-bold block mb-1">平均客單價</span><span className="text-3xl font-black">${summary.orderCount > 0 ? (summary.total / summary.orderCount).toFixed(0) : 0}</span><span className="text-xs text-slate-400 mt-2 italic">共計 {summary.orderCount} 筆交易</span></div>
                     </div>
-                    <div className="border-t border-slate-200 pt-8 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><h4 className="text-sm font-bold text-slate-500 mb-4 flex items-center text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><Receipt size={16} className="mr-2 text-blue-500" /> 原始訂單明細</h4><div className="space-y-2 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900">{summaryOrders.map((order) => { const isOrderExpand = expandOrderId === order.id; return (<div key={order.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><div onClick={(e) => { e.stopPropagation(); setExpandOrderId(isOrderExpand ? null : order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><div className="flex flex-col flex-1 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><span className="text-sm font-bold text-slate-700">號碼 #{order.orderNo || 'N/A'}</span><span className="text-[10px] text-slate-400">{order.time}</span></div><div className="flex-1">{order.orderType === 'takeOut' ? <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold text-orange-600">外帶</span> : <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-1 rounded-md font-bold text-blue-600">內用</span>}</div><div className="text-lg font-black text-slate-800 mr-4 text-slate-900">${order.total}</div><ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} /></div>{isOrderExpand && (<div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><div className="space-y-1 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900 text-slate-900">{renderItemDetails(order.items)}</div></div>)}</div>); })}</div></div>
+                    <div className="border-t border-slate-200 pt-8 text-slate-900"><h4 className="text-sm font-bold text-slate-500 mb-4 flex items-center text-slate-900"><Receipt size={16} className="mr-2 text-blue-500" /> 原始訂單明細</h4><div className="space-y-2 text-slate-900">{summaryOrders.map((order) => { const isOrderExpand = expandOrderId === order.id; return (<div key={order.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm text-slate-900"><div onClick={(e) => { e.stopPropagation(); setExpandOrderId(isOrderExpand ? null : order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900 text-slate-900"><div className="flex flex-col flex-1 text-slate-900 text-slate-900 text-slate-900 text-slate-900"><span className="text-sm font-bold text-slate-700">號碼 #{order.orderNo || 'N/A'}</span><span className="text-[10px] text-slate-400">{order.time}</span></div><div className="flex-1">{order.orderType === 'takeOut' ? <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold text-orange-600">外帶</span> : <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-1 rounded-md font-bold text-blue-600">內用</span>}</div><div className="text-lg font-black text-slate-800 mr-4 text-slate-900">${order.total}</div><ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} /></div>{isOrderExpand && (<div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in text-slate-900 text-slate-900 text-slate-900"><div className="space-y-1">{renderItemDetails(order.items)}</div></div>)}</div>); })}</div></div>
                   </div>
                 )}
               </div>
@@ -565,14 +600,14 @@ const DashboardPage = () => {
           {[...orders].reverse().map(order => {
             const isExpand = expandOrderId === order.id;
             return (
-              <div key={order.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${order.status === 'closed' ? 'border-slate-100 opacity-70' : 'border-blue-200 shadow-blue-50'}`}>
+              <div key={order.id} className={`bg-white rounded-2xl border overflow-hidden transition-all text-slate-900 ${order.status === 'closed' ? 'border-slate-100 opacity-70' : 'border-blue-200 shadow-blue-50'}`}>
                 <div onClick={() => setExpandOrderId(isExpand ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
-                  <div className="flex-1"><div className="font-bold text-slate-700 flex items-center text-slate-900 text-slate-900 text-slate-900">#{order.orderNo || 'N/A'} - {order.date} {order.time} <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{order.orderType === 'takeOut' ? '外帶' : '內用'}</span>
+                  <div className="flex-1 text-slate-900"><div className="font-bold text-slate-700 flex items-center text-slate-900 text-slate-900 text-slate-900">#{order.orderNo || 'N/A'} - {order.date} {order.time} <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{order.orderType === 'takeOut' ? '外帶' : '內用'}</span>
                     {order.paymentStatus === 'pending' && <span className="ml-2 text-[10px] bg-amber-100 text-amber-600 px-2 py-0.5 rounded font-bold italic text-amber-600">待結帳</span>}
-                  </div><div className="text-xs text-slate-400 font-mono italic text-slate-400">ID: {order.id}</div></div>
+                  </div><div className="text-xs text-slate-400 font-mono italic text-slate-400 text-slate-400">ID: {order.id}</div></div>
                   <div className="text-xl font-black text-blue-600 mr-6 text-blue-600">${order.total}</div><ChevronRight className={`text-slate-300 transition-transform ${isExpand ? 'rotate-90' : ''}`} />
                 </div>
-                {isExpand && <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in text-slate-900 text-slate-900 text-slate-900"><div className="space-y-2 text-slate-900 text-slate-900 text-slate-900">{renderItemDetails(order.items)}</div><div className="mt-4 pt-4 border-t flex justify-between font-black text-slate-900 text-slate-900 text-slate-900"><span>總計金額</span><span className="text-blue-600 text-blue-600">${order.total}</span></div></div>}
+                {isExpand && <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in text-slate-900 text-slate-900 text-slate-900"><div className="space-y-2 text-slate-900 text-slate-900 text-slate-900">{renderItemDetails(order.items)}</div><div className="mt-4 pt-4 border-t flex justify-between font-black text-slate-900 text-slate-900 text-slate-900 text-slate-900"><span>總計金額</span><span className="text-blue-600 text-blue-600">${order.total}</span></div></div>}
               </div>
             );
           })}
@@ -589,15 +624,15 @@ const SettingsPage = () => {
 
   return (
     <div className="max-w-2xl text-slate-900">
-      <h2 className="text-2xl font-bold mb-8">系統參數設定</h2>
+      <h2 className="text-2xl font-bold mb-8 text-slate-900">系統參數設定</h2>
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden text-slate-900 text-slate-900">
-        <div className="p-8 space-y-8">
-          <section><label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">店舖名稱</label><input type="text" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-lg text-slate-900 text-slate-900 text-slate-900" value={config.storeName} onChange={(e) => updateConfig('storeName', e.target.value)} /></section>
+        <div className="p-8 space-y-8 text-slate-900">
+          <section><label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block text-slate-400">店舖名稱</label><input type="text" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-lg text-slate-900" value={config.storeName} onChange={(e) => updateConfig('storeName', e.target.value)} /></section>
           <hr className="border-slate-100" />
           <section>
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-4 text-slate-900">
               <div><h4 className="font-bold text-slate-700">內用結帳流程</h4><p className="text-sm text-slate-400">設定內用客人的結帳時機</p></div>
-              <div className="bg-slate-100 p-1 rounded-xl flex"><button onClick={() => updateConfig('dineInMode', 'prePay')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${config.dineInMode === 'prePay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>先結帳</button><button onClick={() => updateConfig('dineInMode', 'postPay')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${config.dineInMode === 'postPay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>後結帳</button></div>
+              <div className="bg-slate-100 p-1 rounded-xl flex text-slate-900"><button onClick={() => updateConfig('dineInMode', 'prePay')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${config.dineInMode === 'prePay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>先結帳</button><button onClick={() => updateConfig('dineInMode', 'postPay')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${config.dineInMode === 'postPay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>後結帳</button></div>
             </div>
             <div className={`p-4 rounded-2xl flex items-start space-x-3 ${config.dineInMode === 'prePay' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>{config.dineInMode === 'prePay' ? <CheckCircle2 size={20} className="shrink-0 mt-0.5 text-blue-700" /> : <Clock size={20} className="shrink-0 mt-0.5 text-amber-700" />}<p className="text-xs leading-relaxed font-medium">{config.dineInMode === 'prePay' ? "模式：【先結帳】。點餐後需立即收款。" : "模式：【後結帳】。點餐後進入「訂單管理」，離開前收款。"}</p></div>
           </section>
