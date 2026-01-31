@@ -798,6 +798,7 @@ const SettingsPage = () => {
       <h2 className="text-2xl font-bold mb-8 text-slate-900">系統參數設定</h2>
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden text-slate-900">
         <div className="p-8 space-y-8 text-slate-900">
+          <div className="bg-slate-50 p-6 border-t border-slate-100 text-center text-slate-900"><p className="text-xs flex items-center justify-center text-slate-400"><Sliders size={14} className="mr-2 text-slate-400" /> 設定立即生效</p></div>
           <section>
             <div className="flex justify-between items-center mb-3 text-slate-900">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-400">店舖名稱</label>
@@ -838,7 +839,6 @@ const SettingsPage = () => {
             </div>
           </section>
         </div>
-        <div className="bg-slate-50 p-6 border-t border-slate-100 text-center text-slate-900"><p className="text-xs flex items-center justify-center text-slate-400"><Sliders size={14} className="mr-2 text-slate-400" /> 設定立即生效</p></div>
       </div>
     </div>
   );
