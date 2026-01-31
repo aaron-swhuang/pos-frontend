@@ -1,0 +1,502 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`結帳視窗 UI 快照應保持一致 1`] = `
+<DocumentFragment>
+  <div
+    class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 text-slate-800"
+  >
+    <div
+      class="bg-white w-full max-w-5xl rounded-[2rem] shadow-2xl flex flex-col lg:flex-row overflow-hidden max-h-[92vh]"
+    >
+      <div
+        class="lg:w-[32%] bg-slate-50 p-5 border-r border-slate-200 flex flex-col justify-between overflow-hidden text-slate-800"
+      >
+        <div
+          class="flex-1 min-h-0 flex flex-col overflow-hidden"
+        >
+          <h3
+            class="text-lg font-bold mb-3"
+          >
+            結帳內容確認
+          </h3>
+          <div
+            class="bg-white/70 rounded-xl border border-slate-100 p-2 overflow-y-auto flex-1"
+          >
+            <div
+              class="flex justify-between text-[11px] text-slate-600 border-b border-slate-50 py-1 last:border-0"
+            >
+              <span
+                class="truncate max-w-[65%] font-medium"
+              >
+                測試商品 x1
+              </span>
+              <span
+                class="font-bold"
+              >
+                $100
+              </span>
+            </div>
+          </div>
+        </div>
+        <div
+          class="space-y-1.5 mt-3 pt-3 border-t border-slate-200 shrink-0"
+        >
+          <div
+            class="flex justify-between text-[11px] text-slate-500 font-bold"
+          >
+            <span>
+              原價小計
+            </span>
+            <span>
+              $100
+            </span>
+          </div>
+          <div
+            class="flex justify-between p-2 rounded-lg border transition-all cursor-pointer border-slate-200 bg-white/40"
+          >
+            <span
+              class="text-[10px] font-bold text-slate-400"
+            >
+              優惠折抵 
+            </span>
+            <span
+              class="text-sm font-black text-red-500"
+            >
+              -$0
+            </span>
+          </div>
+          <div
+            class="flex justify-between items-end pt-1"
+          >
+            <span
+              class="text-xs font-bold text-slate-400 uppercase"
+            >
+              應收總額
+            </span>
+            <span
+              class="text-4xl font-black text-blue-600"
+            >
+              $100
+            </span>
+          </div>
+        </div>
+      </div>
+      <div
+        class="flex-1 p-5 flex flex-col bg-white overflow-hidden justify-between"
+      >
+        <div
+          class="space-y-4"
+        >
+          <div>
+            <h3
+              class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1"
+            >
+              1. 選擇支付方式
+            </h3>
+            <div
+              class="grid grid-cols-3 gap-2"
+            >
+              <button
+                class="flex flex-col items-center justify-center py-2.5 rounded-xl border-2 transition-all gap-1 border-blue-500 bg-blue-50 text-blue-600 shadow-sm"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-banknote"
+                  fill="none"
+                  height="18"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="12"
+                    rx="2"
+                    width="20"
+                    x="2"
+                    y="6"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="2"
+                  />
+                  <path
+                    d="M6 12h.01M18 12h.01"
+                  />
+                </svg>
+                <span
+                  class="font-bold text-[10px] uppercase"
+                >
+                  現金
+                </span>
+              </button>
+              <button
+                class="flex flex-col items-center justify-center py-2.5 rounded-xl border-2 transition-all gap-1 border-slate-100 text-slate-400 hover:bg-slate-50"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-credit-card"
+                  fill="none"
+                  height="18"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="14"
+                    rx="2"
+                    width="20"
+                    x="2"
+                    y="5"
+                  />
+                  <line
+                    x1="2"
+                    x2="22"
+                    y1="10"
+                    y2="10"
+                  />
+                </svg>
+                <span
+                  class="font-bold text-[10px] uppercase"
+                >
+                  刷卡
+                </span>
+              </button>
+              <button
+                class="flex flex-col items-center justify-center py-2.5 rounded-xl border-2 transition-all gap-1 border-slate-100 text-slate-400 hover:bg-slate-50"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-smartphone"
+                  fill="none"
+                  height="18"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="20"
+                    rx="2"
+                    ry="2"
+                    width="14"
+                    x="5"
+                    y="2"
+                  />
+                  <path
+                    d="M12 18h.01"
+                  />
+                </svg>
+                <span
+                  class="font-bold text-[10px] uppercase"
+                >
+                  支付
+                </span>
+              </button>
+            </div>
+          </div>
+          <div>
+            <h3
+              class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1"
+            >
+              2. 套用優惠方案
+            </h3>
+            <div
+              class="flex gap-1.5 flex-wrap px-1"
+            >
+              <button
+                class="px-2.5 py-1.5 rounded-lg border text-[9px] font-black transition-all flex items-center gap-1 bg-slate-50 text-slate-500 border-slate-200"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-ticket"
+                  fill="none"
+                  height="10"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="10"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+                  />
+                  <path
+                    d="M13 5v2"
+                  />
+                  <path
+                    d="M13 17v2"
+                  />
+                  <path
+                    d="M13 11v2"
+                  />
+                </svg>
+                9折優惠
+              </button>
+            </div>
+          </div>
+          <div
+            class="grid grid-cols-2 gap-4"
+          >
+            <div
+              class="space-y-2 flex flex-col justify-center"
+            >
+              <h3
+                class="text-xs font-bold text-slate-400 uppercase mb-1 px-1"
+              >
+                3. 輸入收受金額
+              </h3>
+              <div
+                class="space-y-2"
+              >
+                <div
+                  class="p-3 rounded-xl border-2 cursor-pointer border-blue-500 bg-white ring-4 ring-blue-50"
+                >
+                  <div
+                    class="flex justify-between items-center mb-1"
+                  >
+                    <span
+                      class="text-slate-400 text-[9px] font-bold uppercase"
+                    >
+                      實收
+                    </span>
+                    <div
+                      class="flex gap-1"
+                    >
+                      <button
+                        class="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-bold hover:border-blue-500"
+                        type="button"
+                      >
+                        +100
+                      </button>
+                      <button
+                        class="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-bold hover:border-blue-500"
+                        type="button"
+                      >
+                        +500
+                      </button>
+                      <button
+                        class="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-bold hover:border-blue-500"
+                        type="button"
+                      >
+                        +1000
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    class="flex items-center justify-between text-slate-800 font-black"
+                  >
+                    <span
+                      class="text-lg text-slate-300"
+                    >
+                      $
+                    </span>
+                    <span
+                      class="text-3xl"
+                    >
+                      0
+                    </span>
+                  </div>
+                </div>
+                <div
+                  class="p-3 rounded-xl border flex flex-col justify-center shadow-sm bg-red-50 border-red-100 text-red-500"
+                >
+                  <label
+                    class="text-[9px] font-black opacity-60 uppercase mb-0.5"
+                  >
+                    找零金額
+                  </label>
+                  <div
+                    class="flex items-center justify-between px-1 font-black"
+                  >
+                    <span
+                      class="text-lg"
+                    >
+                      $
+                    </span>
+                    <span
+                      class="text-2xl"
+                    >
+                      金額不足
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="flex flex-col justify-center scale-90 origin-right"
+            >
+              <div
+                class="grid grid-cols-3 gap-1"
+              >
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  1
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  2
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  3
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  4
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  5
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  6
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  7
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  8
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  9
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  0
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  00
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all"
+                  type="button"
+                >
+                  .
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100 text-xs uppercase"
+                  type="button"
+                >
+                  AC
+                </button>
+                <button
+                  class="h-10 lg:h-11 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200"
+                  type="button"
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="lucide lucide-delete"
+                    fill="none"
+                    height="18"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="18"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"
+                    />
+                    <path
+                      d="m12 9 6 6"
+                    />
+                    <path
+                      d="m18 9-6 6"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="flex gap-3 mt-4"
+        >
+          <button
+            class="px-6 py-4 rounded-xl font-bold text-slate-400 hover:bg-slate-50 border border-slate-100 transition-colors"
+            type="button"
+          >
+            取消返回
+          </button>
+          <button
+            class="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 opacity-50 grayscale"
+            disabled=""
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-wallet"
+              fill="none"
+              height="20"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="20"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"
+              />
+              <path
+                d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"
+              />
+            </svg>
+            <span>
+              4. 確認完成結帳
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;

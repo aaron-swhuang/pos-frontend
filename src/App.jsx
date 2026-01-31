@@ -12,7 +12,7 @@ import {
 //import { calculateFinalTotal, calculateChange, getUpdatedCart } from './utils/posLogic';
 
 // --- 1. 全域資料管理中心 ---
-const POSContext = createContext();
+export const POSContext = createContext();
 const getTodayKey = () => new Date().toLocaleDateString();
 
 export const POSProvider = ({ children }) => {
@@ -69,7 +69,7 @@ const Keypad = ({ onInput, onClear, onDelete }) => {
 };
 
 // --- 3. 結帳確認視窗 (步驟 1-2-3-4 & 動態隱藏支付選項) ---
-const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) => {
+export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) => {
   const { config, discountRules } = useContext(POSContext);
   const [discount, setDiscount] = useState('0');
   const [discountName, setDiscountName] = useState('');
