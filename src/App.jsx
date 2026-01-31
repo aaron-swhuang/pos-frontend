@@ -9,6 +9,8 @@ import {
   CalendarCheck, TrendingUp, Receipt
 } from 'lucide-react';
 
+//import { calculateFinalTotal, calculateChange, getUpdatedCart } from './utils/posLogic';
+
 // --- 1. 全域資料管理中心 ---
 const POSContext = createContext();
 const getTodayKey = () => new Date().toLocaleDateString();
@@ -153,7 +155,7 @@ const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) => {
               <div className="flex gap-1.5 flex-wrap px-1">
                 {discountRules.map(rule => (
                   <button key={rule.id} type="button" onClick={() => {
-                    const val = rule.type === 'percentage' ? Math.round(cartTotal * (1 - rule.value)) : rule.value;
+                    const val = cartTotal - (rule.type === 'percentage' ? Math.round(cartTotal * rule.value) : rule.value);
                     setDiscount(val.toString()); setDiscountName(rule.name);
                   }} className={`px-2.5 py-1.5 rounded-lg border text-[9px] font-black transition-all flex items-center gap-1 ${discountName === rule.name ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 text-slate-500 border-slate-200'}`}><Ticket size={10} />{rule.name}</button>
                 ))}
