@@ -209,7 +209,7 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
 };
 
 // --- 4. 組件：作廢原因 ---
-const VoidReasonModal = ({ isOpen, onClose, onConfirm }) => {
+export const VoidReasonModal = ({ isOpen, onClose, onConfirm }) => {
   const [reason, setReason] = useState('');
   if (!isOpen) return null;
   return (
@@ -227,7 +227,7 @@ const VoidReasonModal = ({ isOpen, onClose, onConfirm }) => {
 };
 
 // --- 5. 頁面元件：登入 ---
-const LoginPage = () => {
+export const LoginPage = () => {
   const { setIsLoggedIn } = useContext(POSContext);
   const [auth, setAuth] = useState({ user: '', pass: '' });
   const handleLogin = (e) => {
@@ -250,7 +250,7 @@ const LoginPage = () => {
 };
 
 // --- 6. 側邊導覽列 (獨立組件) ---
-const Sidebar = () => {
+export const Sidebar = () => {
   const { config, setIsLoggedIn } = useContext(POSContext);
   const location = useLocation();
 
@@ -288,7 +288,7 @@ const Sidebar = () => {
 };
 
 // --- 7. 前台收銀頁面 ---
-const POSPage = () => {
+export const POSPage = () => {
   const { menu, setOrders, orders, config } = useContext(POSContext);
   const [cart, setCart] = useState([]);
   const [orderType, setOrderType] = useState('dineIn');
@@ -365,7 +365,7 @@ const POSPage = () => {
 };
 
 // --- 8. 頁面元件：訂單管理 ---
-const OrderManagementPage = () => {
+export const OrderManagementPage = () => {
   const { orders, setOrders } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
   const [activePayOrder, setActivePayOrder] = useState(null);
@@ -417,7 +417,7 @@ const OrderManagementPage = () => {
 };
 
 // --- 9. 頁面元件：店務管理 ---
-const AdminPage = () => {
+export const AdminPage = () => {
   const { menu, setMenu, discountRules, setDiscountRules } = useContext(POSContext);
   const [tab, setTab] = useState('menu');
   const [item, setItem] = useState({ name: '', price: '', category: '' });
@@ -435,7 +435,7 @@ const AdminPage = () => {
         </div>
       </div>
       {tab === 'menu' ? (
-        <><form onSubmit={handleMenuSubmit} className={`bg-white p-6 rounded-3xl border mb-6 shrink-0 ${editId ? 'border-amber-400 ring-4 ring-amber-50 shadow-lg' : 'border-slate-100 shadow-sm'}`}><div className="grid grid-cols-12 gap-4"><div className="col-span-5"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">名稱</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={item.name} onChange={e => setItem({ ...item, name: e.target.value })} /></div><div className="col-span-3"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">分類</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" value={item.category} onChange={e => setItem({ ...item, category: e.target.value })} /></div><div className="col-span-2"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">單價</label><input type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={item.price} onChange={e => setItem({ ...item, price: e.target.value })} /></div><div className="col-span-2 flex items-end"><button type="submit" className="w-full h-12 bg-slate-900 text-white rounded-xl font-bold active:scale-95">新增/更新</button></div></div></form>
+        <><form onSubmit={handleMenuSubmit} className={`bg-white p-6 rounded-3xl border mb-6 shrink-0 ${editId ? 'border-amber-400 ring-4 ring-amber-50 shadow-lg' : 'border-slate-100 shadow-sm'}`}><div className="grid grid-cols-12 gap-4"><div className="col-span-5"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">商品名稱</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={item.name} onChange={e => setItem({ ...item, name: e.target.value })} /></div><div className="col-span-3"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">分類</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" value={item.category} onChange={e => setItem({ ...item, category: e.target.value })} /></div><div className="col-span-2"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">單價</label><input type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={item.price} onChange={e => setItem({ ...item, price: e.target.value })} /></div><div className="col-span-2 flex items-end"><button type="submit" className="w-full h-12 bg-slate-900 text-white rounded-xl font-bold active:scale-95">新增/更新</button></div></div></form>
           <div className="grid gap-3 overflow-y-auto flex-1 pr-2 pb-10 scrollbar-thin">
             {menu.map(i => (
               <div key={i.id} className={`bg-white px-6 py-4 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm ${i.isAvailable ? '' : 'bg-slate-50 opacity-60'}`}>
@@ -550,7 +550,7 @@ export const DashboardPage = () => {
 };
 
 // --- 11. 系統設定 (提醒置頂) ---
-const SettingsPage = () => {
+export const SettingsPage = () => {
   const { config, setConfig } = useContext(POSContext);
   const [isEdit, setIsEdit] = useState(false);
   const [temp, setTemp] = useState(config.storeName);
