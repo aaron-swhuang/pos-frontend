@@ -64,7 +64,10 @@ const mockContextValue = {
   ],
   orders: mockOrders,
   dailySummaries: mockDailySummaries,
-  discountRules: [{ id: 1, name: '9折優惠', type: 'percentage', value: 0.9 }],
+  discountRules: [
+    { id: 1, name: '9折優惠', type: 'percentage', value: 0.9 },
+    { id: 2, name: '折抵10元', type: 'amount', value: 10 }
+  ],
   config: {
     storeName: 'Smart POS',
     dineInMode: 'post Pay',
@@ -125,8 +128,6 @@ describe('OrderManagementPage (訂單管理) 邏輯測試', () => {
     expect(within(completedSection).getByText(/#D001/i)).toBeDefined();
   });
 });
-
-// --- 既有測試項目 (保留並整合) ---
 
 test('結帳視窗 UI 快照應保持一致', () => {
   const { asFragment } = render(
