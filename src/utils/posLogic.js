@@ -20,13 +20,27 @@ export const calculateFinalTotal = (subtotal, discountValue, discountType) => {
   return Math.max(0, finalTotal);
 };
 
-// 2. 找零計算
+// 2. 折扣金額計算
+export const calculateDiscount = (subtotal, discountValue, discountType) => {
+  if (!subtotal || subtotal < 0) return 0;
+  let discount = 0;
+
+  if (discountType === 'percentage') {
+    discount = subtotal - (Math.round(subtotal * discountValue));
+  } else {
+    discount = discountValue || 0;
+  }
+
+  return Math.max(0, discount);
+};
+
+// 3. 找零計算
 export const calculateChange = (cashReceived, finalTotal) => {
   const cash = parseFloat(cashReceived) || 0;
   return cash - finalTotal;
 };
 
-// 3. 購物車累加/更新邏輯
+// 4. 購物車累加/更新邏輯
 export const getUpdatedCart = (prevCart, newItem) => {
   const existingItem = prevCart.find(i => i.id === newItem.id);
   if (existingItem) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateFinalTotal, calculateChange, getUpdatedCart } from '../utils/posLogic';
+import { calculateFinalTotal, calculateChange, getUpdatedCart, calculateDiscount } from '../utils/posLogic';
 
 describe('金額與折扣計算', () => {
   it('應正確計算 9 折優惠 (100 -> 90)', () => {
@@ -13,6 +13,24 @@ describe('金額與折扣計算', () => {
 
   it('定額折抵不應產生負數金額', () => {
     expect(calculateFinalTotal(50, 100, 'amount')).toBe(0);
+  });
+});
+
+describe('折扣計算', () => {
+  it('應正確計算 10 元折抵', () => {
+    expect(calculateDiscount(100, 10, 'amount')).toBe(10);
+  });
+
+  it('應正確計算 9 折優惠 (100 -> 90)', () => {
+    expect(calculateDiscount(100, 0.9, 'percentage')).toBe(10);
+  });
+
+  it('應正確計算 85 折優惠並處理四捨五入 (150 -> 128)', () => {
+    expect(calculateDiscount(150, 0.85, 'percentage')).toBe(22);
+  });
+
+  it('無折抵結果為0', () => {
+    expect(calculateDiscount(100, 0, 'amount')).toBe(0);
   });
 });
 
