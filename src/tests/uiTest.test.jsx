@@ -77,7 +77,7 @@ describe('DashboardPage (報表分析) 深度保護測試', () => {
     expect(revenueElements.length).toBeGreaterThan(0);
 
     // 或者更精確地檢查標題下方的數值
-    expect(screen.getByText(/今日營收 \(排除作廢\)/i)).toBeDefined();
+    expect(screen.getByText(/目前累計營收 \(未日結\)/i)).toBeDefined();
   });
 
   test('2. 歷史彙整報表應可點擊展開並顯示銷量統計', () => {
