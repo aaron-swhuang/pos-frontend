@@ -6,7 +6,9 @@ import {
   Clock, Search, Tag, Edit2, X, CheckCircle2, AlertCircle,
   ClipboardList, Wallet, Banknote, CreditCard, Smartphone,
   Delete, ShieldCheck, RotateCcw, AlertTriangle, Save, Ticket, Eye, EyeOff,
-  CalendarCheck, TrendingUp, Receipt, Database, Copy, Code, ChevronLeft, ChevronsLeft, ChevronsRight, ListFilter, Info
+  CalendarCheck, TrendingUp, Receipt, Database, Copy, Code, ChevronLeft,
+  ChevronsLeft, ChevronsRight, ListFilter, Info, Calendar, FilterX, Play,
+  StopCircle, Lock, Coins
 } from 'lucide-react';
 
 // TODO: 在本地測試環境中，請取消下方的註解並移除「0. 核心業務邏輯」區塊，以恢復模組化架構。
@@ -26,7 +28,10 @@ const calculateFinalTotal = (total, discount) => Math.max(0, total - (parseFloat
 
 const calculateChange = (received, total) => (parseFloat(received) || 0) - total;
 
-// 模擬 getUpdatedCart 邏輯 (如外部邏輯有更複雜的實作請以此為準)
+/**
+ * 更新購物車邏輯
+ * 模擬 getUpdatedCart 邏輯 (如外部邏輯有更複雜的實作請以此為準)
+ */
 const getUpdatedCart = (prevCart, newItem) => {
   const existing = prevCart.find(i => i.id === newItem.id);
   if (existing) {
@@ -56,12 +61,21 @@ export const POSProvider = ({ children }) => {
     { id: 2, name: '8折優惠', type: 'percentage', value: 0.8 },
     { id: 3, name: '現折 $10', type: 'amount', value: 10 }
   ]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
   const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('pos_config')) || {
     dineInMode: 'prePay', storeName: 'Smart POS', enableCreditCard: true, enableMobilePayment: true
   });
 
-  // 全局對話框狀態管理
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // --- 班次管理狀態 ---
+  const [shift, setShift] = useState(() => JSON.parse(localStorage.getItem('pos_shift')) || {
+    isOpen: false,
+    businessDate: null,
+    openedAt: null
+  });
+
+  // --- 全局對話框 (Modal) 狀態 ---
   const [modal, setModal] = useState({
     isOpen: false,
     title: '',
@@ -73,6 +87,7 @@ export const POSProvider = ({ children }) => {
     cancelText: '取消'
   });
 
+  // --- 對話框 Helper 函式 ---
   const showAlert = (title, message, type = 'info') => {
     setModal({
       isOpen: true,
@@ -101,29 +116,41 @@ export const POSProvider = ({ children }) => {
     });
   };
 
-  useEffect(() => {
-    const hasLegacyVoided = orders.some(o => o.status === 'voided');
-    if (hasLegacyVoided) {
-      setOrders(prev => prev.map(o =>
-        o.status === 'voided' ? { ...o, status: 'unclosed', isVoided: true, voidReason: o.voidReason || 'Migration' } : o
-      ));
-    }
-  }, []);
+  // --- 開帳邏輯 ---
+  const openShift = () => {
+    const today = new Date().toLocaleDateString();
+    const newShift = {
+      isOpen: true,
+      businessDate: today,
+      openedAt: new Date().toLocaleString()
+    };
+    setShift(newShift);
+    localStorage.setItem('pos_shift', JSON.stringify(newShift));
+    showAlert('開帳成功', `營業日已設定為 ${today}。`, 'success');
+  };
 
+  // --- 資料持久化 ---
   useEffect(() => {
     localStorage.setItem('pos_menu', JSON.stringify(menu));
     localStorage.setItem('pos_orders', JSON.stringify(orders));
     localStorage.setItem('pos_daily_summaries', JSON.stringify(dailySummaries));
     localStorage.setItem('pos_config', JSON.stringify(config));
     localStorage.setItem('pos_discounts', JSON.stringify(discountRules));
-  }, [menu, orders, dailySummaries, config, discountRules]);
+    localStorage.setItem('pos_shift', JSON.stringify(shift));
+  }, [menu, orders, dailySummaries, config, discountRules, shift]);
 
   return (
     <POSContext.Provider value={{
-      menu, setMenu, orders, setOrders, dailySummaries, setDailySummaries,
-      discountRules, setDiscountRules, isLoggedIn, setIsLoggedIn, config, setConfig,
-      showAlert, showConfirm, modal
-    }}>{children}</POSContext.Provider>
+      menu, setMenu,
+      orders, setOrders,
+      dailySummaries, setDailySummaries,
+      discountRules, setDiscountRules,
+      isLoggedIn, setIsLoggedIn,
+      config, setConfig,
+      shift, setShift, openShift, showAlert, showConfirm, modal
+    }}>
+      {children}
+    </POSContext.Provider>
   );
 };
 
@@ -141,11 +168,19 @@ const GlobalModal = () => {
     }
   };
 
+  const getThemeClasses = () => {
+    if (modal.type === 'danger') return { bg: 'bg-red-50', btn: 'bg-red-600' };
+    if (modal.type === 'success') return { bg: 'bg-green-50', btn: 'bg-green-600' };
+    return { bg: 'bg-blue-50', btn: 'bg-blue-600' };
+  };
+
+  const theme = getThemeClasses();
+
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 border border-white/20">
         <div className="p-10 flex flex-col items-center text-center">
-          <div className={`p-4 rounded-2xl mb-6 ${modal.type === 'danger' ? 'bg-red-50' : modal.type === 'success' ? 'bg-green-50' : 'bg-blue-50'}`}>
+          <div className={`p-4 rounded-2xl mb-6 ${theme.bg}`}>
             {getIcon()}
           </div>
           <h3 className="text-2xl font-black text-slate-800 mb-2">{modal.title}</h3>
@@ -155,14 +190,14 @@ const GlobalModal = () => {
           {modal.onCancel && (
             <button
               onClick={modal.onCancel}
-              className="flex-1 py-6 font-bold text-slate-400 hover:bg-slate-50 transition-colors border-r border-slate-100"
+              className="flex-1 py-6 font-bold text-slate-400 border-r border-slate-100 hover:bg-slate-50 transition-colors"
             >
               {modal.cancelText}
             </button>
           )}
           <button
             onClick={modal.onConfirm}
-            className={`flex-1 py-6 font-black transition-colors hover:opacity-90 ${modal.type === 'danger' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}
+            className={`flex-1 py-6 font-black text-white transition-colors hover:opacity-90 ${theme.btn}`}
           >
             {modal.confirmText}
           </button>
@@ -392,7 +427,7 @@ export const LoginPage = () => {
 
 // --- 6. 側邊導覽列 ---
 export const Sidebar = () => {
-  const { config, setIsLoggedIn, showConfirm } = useContext(POSContext);
+  const { config, setIsLoggedIn, showConfirm, shift } = useContext(POSContext);
   const location = useLocation();
 
   const navItems = [
@@ -410,6 +445,15 @@ export const Sidebar = () => {
         <div className="bg-blue-600 p-2 rounded-lg shadow-lg"><Store size={24} /></div>
         <span className="text-xl font-black uppercase truncate">{config.storeName}</span>
       </div>
+
+      <div className="px-6 py-4">
+        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${shift.isOpen ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+          }`}>
+          <div className={`w-2 h-2 rounded-full animate-pulse ${shift.isOpen ? 'bg-green-400' : 'bg-red-400'}`} />
+          <span className="text-xs font-black uppercase tracking-wider">{shift.isOpen ? '營業中' : '休息結帳中'}</span>
+        </div>
+      </div>
+
       <div className="flex-1 px-4 space-y-2 mt-6 overflow-y-auto">
         {navItems.map(item => (
           <Link
@@ -434,7 +478,7 @@ export const Sidebar = () => {
 
 // --- 7. 前台收銀頁面 ---
 export const POSPage = () => {
-  const { menu, setOrders, orders, config, showConfirm } = useContext(POSContext);
+  const { menu, setOrders, orders, config, shift, openShift, showConfirm } = useContext(POSContext);
   const [cart, setCart] = useState([]);
   const [orderType, setOrderType] = useState('dineIn');
   const [searchTerm, setSearchTerm] = useState('');
@@ -448,11 +492,21 @@ export const POSPage = () => {
   const finalizeOrder = (data) => {
     const handleFinalize = () => {
       const pref = orderType === 'dineIn' ? 'D' : 'T';
-      const c = orders.filter(o => o.date === todayStr && o.orderType === orderType).length;
+      const orderDate = shift.businessDate;
+      const c = orders.filter(o => o.date === orderDate && o.orderType === orderType).length;
       const orderNo = pref + (c + 1).toString().padStart(3, '0');
-      const newO = { id: Date.now(), orderNo, total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0), items: [...cart], orderType, date: todayStr, time: new Date().toLocaleTimeString(), status: 'unclosed', isVoided: false, paymentStatus: (orderType === 'dineIn' && config.dineInMode === 'postPay' && !data.paymentMethod) ? 'pending' : 'paid', ...data };
+
+      const newO = {
+        id: Date.now(), orderNo, total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0),
+        items: [...cart], orderType, date: orderDate, time: new Date().toLocaleTimeString(),
+        status: 'unclosed', isVoided: false,
+        paymentStatus: (orderType === 'dineIn' && config.dineInMode === 'postPay' && !data.paymentMethod) ? 'pending' : 'paid',
+        ...data
+      };
+
       setOrders(prev => [...prev, newO]);
-      setCart([]); setIsCheckoutModalOpen(false);
+      setCart([]);
+      setIsCheckoutModalOpen(false);
     };
 
     if (orderType === 'dineIn' && config.dineInMode === 'postPay' && !data.paymentMethod) {
@@ -462,50 +516,83 @@ export const POSPage = () => {
     }
   };
 
+  if (!shift.isOpen) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="bg-white p-16 rounded-[3rem] shadow-2xl text-center max-w-lg border border-slate-100 animate-in fade-in zoom-in-95">
+          <div className="bg-blue-50 w-24 h-24 rounded-[2rem] flex items-center justify-center text-blue-600 mx-auto mb-8 shadow-inner">
+            <Lock size={48} />
+          </div>
+          <h2 className="text-3xl font-black text-slate-800 mb-4">班次尚未開啟</h2>
+          <p className="text-slate-400 mb-10 leading-relaxed font-medium">系統目前處於「休息結帳」狀態，請先啟動今日班次以開始收銀作業。</p>
+          <button
+            onClick={() => showConfirm('開始營業', '確定要開啟今日班次並設定營業日嗎？', openShift)}
+            className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3"
+          >
+            <Play size={24} /> 啟動今日開帳
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col lg:flex-row gap-8 h-full overflow-hidden text-slate-900">
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex justify-between items-center mb-6 shrink-0">
-          <h2 className="text-2xl font-bold">點餐收銀</h2>
-          <div className="relative w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="搜尋..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-medium" /></div>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-bold">點餐收銀</h2>
+            <div className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest">營業日: {shift.businessDate}</div>
+          </div>
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input type="text" placeholder="搜尋..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" />
+          </div>
         </div>
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 shrink-0 scrollbar-hide">{categories.map(c => (<button key={c} type="button" onClick={() => setSelectedCategory(c)} className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm border transition-all ${selectedCategory === c ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border-slate-100'}`}>{c}</button>))}</div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10 scrollbar-thin content-start">
-          {filtered.map(item => (
-            <button key={item.id} type="button" onClick={() => { if (!item.isAvailable) return; setCart(prev => getUpdatedCart(prev, item)) }} className={`p-6 rounded-[2rem] shadow-sm border text-left group h-fit relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-500 hover:shadow-md' : 'bg-slate-50 opacity-60 grayscale'}`}>
-              <div className="font-bold mb-1 truncate group-hover:text-blue-600 transition-colors">{item.name}</div><div className="font-black text-xl text-blue-600">${item.price}</div>
-              {!item.isAvailable && <div className="absolute inset-0 bg-slate-900/5 flex items-center justify-center"><span className="bg-slate-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest shadow-sm">暫不供應</span></div>}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 shrink-0 no-scrollbar">
+          {categories.map(c => (
+            <button key={c} onClick={() => setSelectedCategory(c)} className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm border transition-all ${selectedCategory === c ? 'bg-blue-600 text-white shadow-md border-blue-600' : 'bg-white text-slate-500 border-slate-100 hover:border-blue-200'}`}>
+              {c}
             </button>
           ))}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10 content-start scrollbar-thin">          {filtered.map(item => (
+          <button key={item.id} onClick={() => { if (!item.isAvailable) return; setCart(prev => getUpdatedCart(prev, item)) }} className={`p-6 rounded-[2rem] shadow-sm border text-left group h-fit relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-500' : 'bg-slate-50 opacity-60 grayscale'}`}>
+            <div className="font-bold mb-1 truncate">{item.name}</div>
+            <div className="font-black text-xl text-blue-600">${item.price}</div>
+            {!item.isAvailable && <div className="absolute inset-0 bg-slate-900/5 flex items-center justify-center"><span className="bg-slate-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest shadow-sm">暫不供應</span></div>}
+          </button>
+        ))}
         </div>
       </div>
       <div className="w-full lg:w-96 flex-shrink-0 bg-white rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-50 h-full overflow-hidden">
         <div className="p-8 border-b flex flex-col gap-4 bg-slate-50/50 shrink-0">
           <div className="flex justify-between items-center"><h3 className="font-bold text-xl">購物車</h3><span className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-md shadow-blue-100">{cart.reduce((s, i) => s + i.quantity, 0)} 件</span></div>
           <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-inner font-bold">
-            <button type="button" onClick={() => setOrderType('dineIn')} className={`flex items-center justify-center py-2.5 rounded-xl text-sm transition-all ${orderType === 'dineIn' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><Utensils size={16} className="mr-2" />內用</button>
-            <button type="button" onClick={() => setOrderType('takeOut')} className={`flex items-center justify-center py-2.5 rounded-xl text-sm transition-all ${orderType === 'takeOut' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><ShoppingBag size={16} className="mr-2" />外帶</button>
-          </div>
+            <button onClick={() => setOrderType('dineIn')} className={`flex items-center justify-center py-2.5 rounded-xl text-sm transition-all ${orderType === 'dineIn' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><Utensils size={16} className="mr-2" />內用</button>
+            <button onClick={() => setOrderType('takeOut')} className={`flex items-center justify-center py-2.5 rounded-xl text-sm transition-all ${orderType === 'takeOut' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><ShoppingBag size={16} className="mr-2" />外帶</button>          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
           {cart.map(i => (
-            <div key={i.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <div key={i.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-100 transition-all">
               <div className="flex justify-between items-start mb-3"><span className="font-bold text-slate-700 text-sm">{i.name}</span><span className="font-black text-slate-900 text-sm">${i.price * i.quantity}</span></div>
               <div className="flex justify-between items-center mt-2">
                 <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl overflow-hidden shadow-inner">
-                  <button type="button" onClick={() => { const nQty = Math.max(0, i.quantity - 1); if (nQty > 0) setCart(cart.map(it => it.id === i.id ? { ...it, quantity: nQty } : it)); else setCart(cart.filter(it => it.id !== i.id)); }} className="p-2.5 hover:bg-slate-200 transition-colors text-slate-500"><Minus size={14} /></button>
+                  <button onClick={() => { const nQty = Math.max(0, i.quantity - 1); if (nQty > 0) setCart(cart.map(it => it.id === i.id ? { ...it, quantity: nQty } : it)); else setCart(cart.filter(it => it.id !== i.id)); }} className="p-2.5 hover:bg-slate-200 transition-colors text-slate-500"><Minus size={14} /></button>
                   <span className="w-10 text-center font-bold text-sm text-slate-700">{i.quantity}</span>
-                  <button type="button" onClick={() => setCart(cart.map(it => it.id === i.id ? { ...it, quantity: it.quantity + 1 } : it))} className="p-2.5 hover:bg-slate-200 transition-colors text-slate-500"><Plus size={14} /></button>
+                  <button onClick={() => setCart(cart.map(it => it.id === i.id ? { ...it, quantity: it.quantity + 1 } : it))} className="p-2.5 hover:bg-slate-200 transition-colors text-slate-500"><Plus size={14} /></button>
                 </div>
-                <button type="button" onClick={() => setCart(cart.filter(it => it.id !== i.id))} className="text-red-300 hover:text-red-500 p-2 transition-colors"><Trash2 size={18} /></button>
+                <button onClick={() => setCart(cart.filter(it => it.id !== i.id))} className="text-red-300 hover:text-red-500 p-2 transition-colors"><Trash2 size={18} /></button>
               </div>
             </div>
           ))}
           {cart.length === 0 && <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-60"><ShoppingCart size={64} className="mb-4 opacity-20" /><p className="text-sm font-medium">尚未點餐</p></div>}
         </div>
-        <div className="p-8 bg-slate-900 text-white rounded-b-[2.5rem] shrink-0">
-          <div className="flex justify-between items-center mb-6"><span className="text-slate-400 font-medium">應付總計</span><span className="text-4xl font-black">${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}</span></div>
-          <button type="button" onClick={() => { if (cart.length > 0) { if (orderType === 'dineIn' && config.dineInMode === 'postPay') finalizeOrder({ total: cart.reduce((s, i) => s + (i.price * i.quantity), 0) }); else setIsCheckoutModalOpen(true); } }} disabled={cart.length === 0} className={`w-full py-5 rounded-2xl font-black text-lg transition-all active:scale-95 shadow-xl ${orderType === 'dineIn' && config.dineInMode === 'postPay' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}>{orderType === 'dineIn' && config.dineInMode === 'postPay' ? '送出訂單 (待付款)' : '進行結帳確認'}</button>
+        <div className="p-8 bg-slate-900 text-white rounded-b-[2.5rem]">
+          <div className="flex justify-between items-center mb-6"><span className="text-slate-400 font-medium">應付總計</span><span className="text-4xl font-black tracking-tight">${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}</span></div>
+          <button type="button" onClick={() => { if (cart.length > 0) { if (orderType === 'dineIn' && config.dineInMode === 'postPay') finalizeOrder({ total: cart.reduce((s, i) => s + (i.price * i.quantity), 0) }); else setIsCheckoutModalOpen(true); } }} disabled={cart.length === 0} className={`w-full py-5 rounded-2xl font-black text-lg transition-all active:scale-95 shadow-xl ${orderType === 'dineIn' && config.dineInMode === 'postPay' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
+            {orderType === 'dineIn' && config.dineInMode === 'postPay' ? '送出訂單 (待付款)' : '進行結帳確認'}
+          </button>
         </div>
       </div>
       <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} cartTotal={cart.reduce((s, i) => s + (i.price * i.quantity), 0)} items={cart} onConfirm={finalizeOrder} />
@@ -515,13 +602,21 @@ export const POSPage = () => {
 
 // --- 8. 頁面元件：訂單管理 ---
 export const OrderManagementPage = () => {
-  const { orders, setOrders } = useContext(POSContext);
+  const { orders, setOrders, shift } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
   const [activePayOrder, setActivePayOrder] = useState(null);
   const [voidId, setVoidId] = useState(null);
 
   const pending = orders.filter(o => o.status === 'unclosed' && o.paymentStatus === 'pending' && !o.isVoided);
   const history = orders.filter(o => o.status === 'unclosed' && (o.paymentStatus === 'paid' || o.isVoided));
+
+  const handleActionClick = (actionFn) => {
+    if (!shift.isOpen) {
+      showAlert('操作已鎖定', '目前班次已結清休息中，無法修改現有訂單。', 'danger');
+      return;
+    }
+    actionFn();
+  };
 
   return (
     <div className="max-w-6xl h-full flex flex-col overflow-hidden text-slate-900">
@@ -545,7 +640,7 @@ export const OrderManagementPage = () => {
           </div>
         </div>
         <div className="flex flex-col min-h-0">
-          <h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2"><CheckCircle2 size={16} className="text-blue-500" /> 已付款/作廢單 (未日結)</h3>
+          <h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2"><CheckCircle2 size={16} className="text-blue-500" /> 已付清 / 已作廢 (未結算)</h3>
           <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
             {[...history].reverse().map(o => (
               <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-5 rounded-[1.5rem] border border-slate-100 transition-all cursor-pointer ${o.isVoided ? 'opacity-40 grayscale bg-slate-50 border-dashed' : 'hover:bg-blue-50/30'}`}>
@@ -596,6 +691,18 @@ export const AdminPage = () => {
     setItem({ name: '', price: '', category: '' });
   };
 
+  const handleDiscountSubmit = (e) => {
+    e.preventDefault();
+    if (!newDisc.name || !newDisc.value) return;
+    setDiscountRules([...discountRules, {
+      id: Date.now(),
+      name: newDisc.name,
+      type: newDisc.type,
+      value: parseFloat(newDisc.value)
+    }]);
+    setNewDisc({ name: '', type: 'percentage', value: '' });
+  };
+
   return (
     <div className="max-w-4xl h-full flex flex-col overflow-hidden text-slate-900">
       <div className="flex justify-between items-center mb-6 shrink-0">
@@ -640,53 +747,45 @@ export const AdminPage = () => {
 
 // --- 10. 頁面元件：報表分析 ---
 export const DashboardPage = () => {
-  const { orders, dailySummaries, setDailySummaries, setOrders, showAlert, showConfirm } = useContext(POSContext);
+  const { orders, dailySummaries, setDailySummaries, setOrders, showAlert, showConfirm, shift, setShift } = useContext(POSContext);
   const [expandOrderId, setExpandOrderId] = useState(null);
   const [expandSummaryId, setExpandSummaryId] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  const unclosedPaidOrders = useMemo(() =>
-    orders.filter(o => o.status === 'unclosed' && o.paymentStatus === 'paid' && !o.isVoided),
-    [orders]);
+  const currentShiftCompletedOrders = useMemo(() => orders.filter(o => o.status === 'unclosed' && (o.paymentStatus === 'paid' || o.isVoided)), [orders]);
+  const totalRevenue = currentShiftCompletedOrders.filter(o => !o.isVoided).reduce((s, o) => s + o.total, 0);
 
-  const totalRevenue = unclosedPaidOrders.reduce((s, o) => s + o.total, 0);
+  const performSettlement = (businessDate, allOrders) => {
+    const targetOrders = allOrders.filter(o => o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided));
+    if (targetOrders.length === 0) return;
 
-  const handleDailyClosing = () => {
-    const pendingOrders = orders.filter(o =>
-      o.status === 'unclosed' &&
-      o.paymentStatus === 'pending' &&
-      !o.isVoided
-    );
-
-    if (pendingOrders.length > 0) {
-      showAlert('無法執行日結', `目前還有 ${pendingOrders.length} 筆「待收款」單據未處理。`, 'danger');
-      return;
-    }
-
-    showConfirm(
-      '執行日結結算',
-      '確定要結束今日班次嗎？結算後的訂單將會封存。',
-      () => {
-        const grouped = orders.filter(o => o.status === 'unclosed').reduce((acc, order) => {
-          const date = order.date;
-          if (!acc[date]) {
-            acc[date] = { id: Date.now() + Math.random(), date, total: 0, orderCount: 0, voidedCount: 0, closedAt: new Date().toLocaleString(), itemSales: {}, typeCount: { dineIn: 0, takeOut: 0 }, relatedOrders: [] };
-          }
-          if (order.isVoided) acc[date].voidedCount += 1;
-          else {
-            acc[date].total += order.total;
-            acc[date].orderCount += 1;
-            acc[date].typeCount[order.orderType || 'dineIn'] += 1;
-            order.items?.forEach(item => { acc[date].itemSales[item.name] = (acc[date].itemSales[item.name] || 0) + (item.quantity || 1); });
-          }
-          acc[date].relatedOrders.push(order);
-          return acc;
-        }, {});
-        setDailySummaries([...dailySummaries, ...Object.values(grouped)]);
-        setOrders(orders.map(o => o.status === 'unclosed' ? { ...o, status: 'closed' } : o));
-        showAlert('日結完成', '今日數據已彙整成功。', 'success');
+    const summary = targetOrders.reduce((acc, order) => {
+      if (order.isVoided) { acc.voidedOrders.push(order); acc.voidedCount += 1; }
+      else {
+        acc.total += order.total; acc.orderCount += 1; acc.typeCount[order.orderType || 'dineIn'] += 1;
+        order.items?.forEach(item => { acc.itemSales[item.name] = (acc.itemSales[item.name] || 0) + (item.quantity || 1); });
       }
-    );
+      acc.relatedOrders.push(order);
+      return acc;
+    }, { total: 0, orderCount: 0, voidedCount: 0, itemSales: {}, typeCount: { dineIn: 0, takeOut: 0 }, relatedOrders: [], voidedOrders: [] });
+
+    setDailySummaries(prev => {
+      const updated = [...prev];
+      const existingIdx = updated.findIndex(s => s.date === businessDate);
+      if (existingIdx > -1) {
+        const existing = { ...updated[existingIdx] };
+        existing.total += summary.total; existing.orderCount += summary.orderCount; existing.voidedCount += summary.voidedCount; existing.closedAt = new Date().toLocaleString();
+        Object.entries(summary.itemSales).forEach(([n, q]) => { existing.itemSales[n] = (existing.itemSales[n] || 0) + q; });
+        existing.typeCount.dineIn += summary.typeCount.dineIn; existing.typeCount.takeOut += summary.typeCount.takeOut;
+        existing.relatedOrders = [...(existing.relatedOrders || []), ...summary.relatedOrders];
+        existing.voidedOrders = [...(existing.voidedOrders || []), ...summary.voidedOrders];
+        updated[existingIdx] = existing;
+      } else {
+        updated.push({ id: Date.now(), date: businessDate, ...summary, closedAt: new Date().toLocaleString() });
+      }
+      return updated;
+    });
+    setOrders(prev => prev.map(o => (o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided)) ? { ...o, status: 'closed' } : o));
   };
 
   const renderItemDetails = (items) => (items || []).map((item, idx) => (
@@ -697,38 +796,85 @@ export const DashboardPage = () => {
   ));
 
   return (
-    <div className="max-w-5xl h-full flex flex-col overflow-hidden text-slate-900">
+    <div className="max-w-5xl h-full flex flex-col overflow-hidden text-slate-900 px-2 font-sans">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 shrink-0">
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-3xl text-white shadow-xl flex flex-col justify-between min-h-[220px]">
-          <div><p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2">目前累計營收 (未日結)</p><h3 className="text-5xl font-black">${totalRevenue}</h3></div>
-          <button type="button" onClick={handleDailyClosing} className="mt-6 flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 px-6 py-3 rounded-xl font-bold border border-white/30"><CalendarCheck size={20} /><span>執行日結結帳</span></button>
+        <div className={`p-10 rounded-3xl text-white shadow-xl flex flex-col justify-between min-h-[220px] transition-all ${shift.isOpen ? 'bg-gradient-to-br from-blue-600 to-indigo-700' : 'bg-gradient-to-br from-slate-600 to-slate-800'}`}>
+          <div><p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2 font-black">{shift.isOpen ? `營業日 ${shift.businessDate} 當前總額` : '休息結帳中 - SHIFT CLOSED'}</p><h3 className="text-5xl font-black tracking-tight font-mono">${totalRevenue}</h3></div>
+          {shift.isOpen && (
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button onClick={() => showConfirm('先行結算', '將目前數據併入日報，但不關帳？', () => performSettlement(shift.businessDate, orders))} className="bg-white/10 hover:bg-white/20 px-4 py-3.5 rounded-2xl font-bold border border-white/20 flex items-center justify-center gap-2 transition-all shadow-inner active:scale-95"><Coins size={18} /><span>先行結算</span></button>
+              <button onClick={() => {
+                const unclosedOrders = orders.filter(o => o.status === 'unclosed');
+                const pendingOrders = unclosedOrders.filter(o => o.paymentStatus === 'pending' && !o.isVoided);
+                if (pendingOrders.length > 0) showAlert('無法關帳', `還有 ${pendingOrders.length} 筆單據待處理。`, 'danger');
+                else showConfirm('日結關帳', `結束營業日 ${shift.businessDate} 並封存數據？`, () => { performSettlement(shift.businessDate, orders); setShift({ isOpen: false, businessDate: null, openedAt: null }); });
+              }} className="bg-white text-blue-700 px-4 py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg hover:bg-blue-50 active:scale-95 transition-all"><StopCircle size={18} /><span>日結關帳</span></button>
+            </div>
+          )}
         </div>
-        <div className="bg-white p-10 rounded-3xl border border-slate-100 flex flex-col justify-center shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-widest mb-2 text-slate-400">當前支付分佈</p>
-          <div className="space-y-2">
-            {['Cash', 'Credit', 'Mobile'].map(pm => (<div key={pm} className="flex justify-between items-center text-sm"><span className="font-bold uppercase text-[10px] text-slate-400">{pm === 'Cash' ? '現金' : pm === 'Credit' ? '刷卡' : '支付'}</span><span className="font-black text-slate-700">${unclosedPaidOrders.filter(o => o.paymentMethod === pm).reduce((s, o) => s + o.total, 0)}</span></div>))}
-          </div>
-        </div>
+        <div className="bg-white p-10 rounded-3xl border border-slate-100 flex flex-col justify-center shadow-sm"><p className="text-sm font-bold uppercase tracking-widest mb-4 text-slate-400 font-black">當前班次支付分佈</p><div className="space-y-3 font-sans font-medium">{['Cash', 'Credit', 'Mobile'].map(pm => (<div key={pm} className="flex justify-between items-center text-sm font-medium"><span className="uppercase text-[10px] text-slate-400 font-black">{pm === 'Cash' ? '現金' : pm === 'Credit' ? '刷卡' : '支付'}</span><span className="font-black text-slate-700 font-mono">${currentShiftCompletedOrders.filter(o => o.paymentMethod === pm && !o.isVoided).reduce((s, o) => s + o.total, 0)}</span></div>))}</div></div>
       </div>
-      <div className="flex space-x-4 mb-6 border-b border-slate-200 shrink-0">
-        <button type="button" onClick={() => setShowHistory(false)} className={`pb-4 px-4 font-bold transition-all border-b-2 ${!showHistory ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>日報彙整</button>
-        <button type="button" onClick={() => setShowHistory(true)} className={`pb-4 px-4 font-bold transition-all border-b-2 ${showHistory ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>交易明細 (未日結)</button>
-      </div>
+      <div className="flex space-x-4 mb-6 border-b border-slate-200 shrink-0"><button onClick={() => setShowHistory(false)} className={`pb-4 px-4 font-bold transition-all border-b-2 ${!showHistory ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>日報彙整</button><button onClick={() => setShowHistory(true)} className={`pb-4 px-4 font-bold transition-all border-b-2 ${showHistory ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>交易明細</button></div>
       <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-thin">
         {!showHistory ? (
           <div className="space-y-4">
-            {[...dailySummaries].reverse().map((summary) => (<div key={summary.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all"><div onClick={() => setExpandSummaryId(expandSummaryId === summary.id ? null : summary.id)} className={`p-6 flex items-center justify-between cursor-pointer ${expandSummaryId === summary.id ? 'bg-blue-50/50' : ''}`}><div className="flex items-center space-x-4"><div className="bg-green-100 text-green-600 p-3 rounded-xl"><FileText /></div><div><div className="font-bold text-lg text-slate-800">{summary.date} 彙整報表</div><div className="text-xs italic text-slate-400">結算：{summary.closedAt}</div></div></div><div className="flex items-center space-x-8"><div className="text-right"><div className="text-xs uppercase font-bold text-slate-400">總金額</div><div className="text-2xl font-black text-blue-600">${summary.total}</div></div>{expandSummaryId === summary.id ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}</div></div>
-              {expandSummaryId === summary.id && (
-                <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 animate-in fade-in space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h4 className="text-xs font-bold uppercase mb-4 flex items-center text-slate-400"><TrendingUp size={14} className="mr-2 text-blue-500" /> 銷量統計</h4><div className="space-y-2">{Object.entries(summary.itemSales || {}).map(([name, count]) => (<div key={name} className="flex justify-between items-center text-sm"><span className="text-slate-600">{name}</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{count}</span></div>))}</div></div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h4 className="text-xs font-bold uppercase mb-4 flex items-center text-orange-500"><Utensils size={14} className="mr-2 text-orange-500" /> 內外帶</h4><div className="space-y-4"><div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-600">內用</span><span className="font-black text-blue-600">{summary.typeCount?.dineIn || 0}</span></div><div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-600">外帶</span><span className="font-black text-orange-600">{summary.typeCount?.takeOut || 0}</span></div></div></div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center"><span className="text-xs uppercase font-bold block mb-1 text-slate-400">平均客單</span><span className="text-2xl font-black text-slate-900">${summary.orderCount > 0 ? (summary.total / summary.orderCount).toFixed(0) : 0}</span><span className="text-[10px] mt-2 italic text-slate-400">共計 {summary.orderCount} 筆</span></div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center"><span className="text-xs uppercase font-bold block mb-1 text-slate-400">異常統計</span><span className="text-2xl font-black text-red-500">{summary.voidedCount || 0}</span><span className="text-[10px] mt-2 italic text-slate-400">作廢訂單數</span></div></div><div className="border-t border-slate-200 pt-8"><h4 className="text-sm font-bold mb-4 flex items-center text-slate-900"><Receipt size={16} className="mr-2 text-blue-500" /> 原始訂單明細 (含作廢)</h4><div className="space-y-2">{(summary.relatedOrders || []).map((order) => { const isOrderExpand = expandOrderId === order.id; return (<div key={order.id} className={`bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm ${order.isVoided ? 'opacity-40 grayscale' : ''}`}><div onClick={(e) => { e.stopPropagation(); setExpandOrderId(isOrderExpand ? null : order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors"><div className="flex flex-col flex-1"><span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>號碼 #{order.orderNo || 'N/A'}</span><span className="text-[10px] text-slate-400">{order.time}</span></div><div className="flex-1">{order.isVoided ? <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">已作廢</span> : (order.orderType === 'takeOut' ? <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold">外帶</span> : <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-1 rounded-md font-bold">內用</span>)}</div><div className="text-lg font-black mr-4 text-slate-800">${order.total}</div><ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} /></div>{isOrderExpand && (<div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in">{renderItemDetails(order.items)}</div>)}</div>); })}</div></div></div>)}</div>))}</div>
-        ) : (
-          <div className="space-y-3">
-            {orders.filter(o => o.status === 'unclosed').reverse().map(order => (<div key={order.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${order.isVoided ? 'opacity-30' : 'border-blue-200 shadow-blue-50'}`}><div onClick={() => setExpandOrderId(expandOrderId === order.id ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900"><div className="flex-1"><div className="font-bold flex items-center text-slate-700">#{order.orderNo || 'N/A'} - {order.date} <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}</span></div><div className="text-xs font-mono italic text-slate-400">ID: {order.id} {order.isVoided && `| 原因: ${order.voidReason}`}</div></div><div className={`text-xl font-black mr-6 ${order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}`}>${order.total}</div><ChevronRight className={`text-slate-300 transition-transform ${expandOrderId === order.id ? 'rotate-90' : ''}`} /></div>{expandOrderId === order.id && <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in"><div className="space-y-2">{renderItemDetails(order.items)}</div><div className="mt-4 pt-4 border-t flex justify-between font-black"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div></div>}</div>))}
+            {[...dailySummaries].reverse().map(summary => (
+              <div key={summary.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                <div onClick={() => setExpandSummaryId(expandSummaryId === summary.id ? null : summary.id)} className={`p-6 flex items-center justify-between cursor-pointer ${expandSummaryId === summary.id ? 'bg-blue-50/50' : ''}`}><div className="flex items-center space-x-4"><div className="bg-green-100 text-green-600 p-3 rounded-xl shadow-sm"><FileText /></div><div><div className="font-bold text-lg text-slate-800 tracking-tight">{summary.date} 彙整報表</div><div className="text-xs text-slate-400 font-medium font-mono opacity-60">最後結算：{summary.closedAt}</div></div></div><div className="flex items-center space-x-8"><div className="text-right"><div className="text-xs uppercase font-black text-slate-400 tracking-tighter">總金額</div><div className="text-2xl font-black text-blue-600 tracking-tight font-mono font-mono">${summary.total}</div></div>{expandSummaryId === summary.id ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}</div></div>
+                {expandSummaryId === summary.id && (
+                  <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 animate-in fade-in space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-[10px] font-black uppercase mb-4 text-slate-400 tracking-widest">銷量統計</h4><div className="space-y-2">{Object.entries(summary.itemSales || {}).map(([name, count]) => (<div key={name} className="flex justify-between items-center text-sm font-medium"><span className="text-slate-600">{name}</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{count}</span></div>))}</div></div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-xs font-bold uppercase mb-4 flex items-center text-orange-500"><Utensils size={14} className="mr-2 text-orange-500" /> 內外帶</h4><div className="space-y-4"><div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-600">內用</span><span className="font-black text-blue-600">{summary.typeCount?.dineIn || 0}</span></div><div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-600">外帶</span><span className="font-black text-orange-600">{summary.typeCount?.takeOut || 0}</span></div></div></div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-[10px] font-black uppercase mb-4 text-slate-400 tracking-widest text-red-500">異常統計</h4><span className="text-2xl font-black text-red-600">{summary.voidedCount || 0}</span><p className="text-[10px] text-slate-400 mt-2 italic">作廢訂單數</p></div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center"><span className="text-xs uppercase font-black block mb-1 text-slate-400 tracking-widest">平均客單</span><span className="text-2xl font-black text-slate-900 tracking-tight font-mono font-mono font-mono font-mono">${summary.orderCount > 0 ? (summary.total / summary.orderCount).toFixed(0) : 0}</span><span className="text-[10px] mt-2 italic text-slate-400 font-mono">共計 {summary.orderCount} 筆</span></div>
+                    </div>
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-bold mb-4 flex items-center text-slate-900"><Receipt size={16} className="mr-2 text-blue-500" /> 原始訂單明細 (含作廢)</h4>
+                      <div className="space-y-2">
+                        {(summary.relatedOrders || []).map(order => {
+                          const isOrderExpand = expandOrderId === order.id;
+                          return (
+                            <div key={order.id} className={`bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm ${order.isVoided ? 'opacity-40 grayscale' : ''}`}>
+                              <div onClick={(e) => { e.stopPropagation(); setExpandOrderId(isOrderExpand ? null : order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors">
+                                <div className="flex flex-col flex-1"><span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>號碼 #{order.orderNo || 'N/A'}</span><span className="text-[10px] text-slate-400">{order.time}</span></div>
+                                <div className="flex-1">{order.isVoided ? <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">已作廢</span> : (order.orderType === 'takeOut' ? <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold">外帶</span> : <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-1 rounded-md font-bold">內用</span>)}</div>
+                                <div className="text-lg font-black mr-4 text-slate-800 font-mono">${order.total}</div>
+                                <ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} />
+                              </div>
+                              {isOrderExpand && (<div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in">{renderItemDetails(order.items)}</div>)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
+        ) : (
+          <div className="space-y-3">{orders.filter(o => o.status === 'unclosed').reverse().map(order => {
+            const isOrderExpand = expandOrderId === order.id;
+            return (
+              <div key={order.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${order.isVoided ? 'opacity-30' : 'border-blue-200 shadow-blue-50 shadow-sm'}`}>
+                <div onClick={() => setExpandOrderId(isOrderExpand ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
+                  <div className="flex-1">
+                    <div className="font-bold flex items-center text-slate-700">#{order.orderNo || 'N/A'} - {order.date} <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}</span></div>
+                    <div className="text-xs font-mono italic text-slate-400">ID: {order.id} {order.isVoided && `| 原因: ${order.voidReason}`}</div>
+                  </div>
+                  <div className={`text-xl font-black mr-6 ${order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}`}>${order.total}</div>
+                  <ChevronRight size={20} className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} />
+                </div>
+                {isOrderExpand && (
+                  <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in">
+                    <div className="space-y-2">{renderItemDetails(order.items)}</div>
+                    <div className="mt-4 pt-4 border-t flex justify-between font-black"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div>
+                  </div>
+                )}
+              </div>
+            );
+          })}</div>
         )}
       </div>
     </div>
@@ -967,39 +1113,55 @@ export const DatabaseViewPage = () => {
 export const SettingsPage = () => {
   const { config, setConfig, showAlert } = useContext(POSContext);
   const [isEdit, setIsEdit] = useState(false);
-  const [temp, setTemp] = useState(config.storeName);
-  const handleSave = () => { setConfig(p => ({ ...p, storeName: temp })); setIsEdit(false); showAlert('儲存成功', 'success'); };
+  const [temp, setTemp] = useState(config?.storeName || '');
+
+  const handleSave = () => {
+    setConfig(p => ({ ...p, storeName: temp }));
+    setIsEdit(false);
+    showAlert('成功', '儲存成功', 'success');
+  };
+
   return (
-    <div className="max-w-2xl h-full flex flex-col pb-32 text-slate-900">
-      <h2 className="text-2xl font-black text-slate-800 mb-8 px-2">系統參數設定</h2>
+    <div className="max-w-2xl mx-auto w-full font-sans pb-32 animate-in fade-in slide-in-from-bottom-2 px-4">
+      <h2 className="text-2xl font-black text-slate-800 mb-8 px-2 tracking-tight uppercase">系統參數設定</h2>
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 space-y-10">
         <div className="bg-blue-50 p-4 rounded-2xl flex items-center gap-3 text-blue-600 mb-2"><AlertCircle size={20} /><span className="text-sm font-bold">提醒：在此更改的所有設定將立即生效。</span></div>
         <section>
-          <div className="flex justify-between items-center mb-4 text-slate-400 px-1"><label className="text-xs font-black uppercase tracking-widest">店舖名稱</label>
-            {!isEdit ? <button type="button" onClick={() => { setIsEdit(true); setTemp(config?.storeName) }} className="text-blue-600 text-xs font-bold flex items-center gap-1.5 hover:underline"><Edit2 size={12} /> 修改店名</button>
-              : <div className="flex gap-5"><button type="button" onClick={handleSave} className="text-green-600 text-xs font-black flex items-center gap-1.5"><Save size={14} /> 儲存</button><button type="button" onClick={() => setIsEdit(false)} className="text-slate-400 text-xs font-bold">取消</button></div>
-            }
+          <div className="flex justify-between items-center mb-4 text-slate-400 px-1">
+            <label className="text-xs font-black uppercase tracking-widest">店舖名稱</label>
+            {!isEdit ? (
+              <button onClick={() => { setIsEdit(true); setTemp(config?.storeName || '') }} className="text-blue-600 text-xs font-bold flex items-center gap-1.5 hover:underline"><Edit2 size={12} /> 修改店名</button>
+            ) : (
+              <div className="flex gap-5"><button onClick={handleSave} className="text-green-600 text-xs font-black flex items-center gap-1.5 hover:underline active:scale-95"><Save size={14} /> 儲存</button><button onClick={() => setIsEdit(false)} className="text-slate-400 text-xs font-bold hover:underline">取消</button></div>
+            )}
           </div>
-          <div className={`transition-all rounded-2xl ${isEdit ? 'ring-4 ring-blue-50 border-blue-500 shadow-lg' : 'border-slate-100'}`}><input type="text" disabled={!isEdit} className={`w-full px-6 py-4 border rounded-2xl outline-none font-black text-xl transition-all ${!isEdit ? 'bg-slate-50 text-slate-500 border-transparent cursor-not-allowed' : 'bg-white text-slate-900 border-blue-500'}`} value={temp} onChange={e => setTemp(e.target.value)} /></div>
+          <div className={`transition-all rounded-2xl ${isEdit ? 'ring-4 ring-blue-50 border-blue-500 shadow-lg' : 'border-slate-100'}`}><input type="text" disabled={!isEdit} className={`w-full px-8 py-5 border rounded-[1.5rem] outline-none font-black text-2xl transition-all ${!isEdit ? 'bg-slate-50 text-slate-500 border-transparent shadow-inner cursor-not-allowed font-mono' : 'bg-white text-slate-900 border-blue-500'}`} value={temp} onChange={e => setTemp(e.target.value)} /></div>
         </section>
+
         <hr className="border-slate-100" />
-        <section><div className="flex justify-between items-center mb-6 px-1"><div><h4 className="font-bold text-lg text-slate-700">內用結帳流程</h4><p className="text-xs text-slate-400 mt-0.5">決定點餐後是否需立
-          即完成付款</p></div><div className="bg-slate-100 p-1.5 rounded-2xl flex shadow-inner"><button type="button" onClick={() => setConfig(p => ({ ...p, dineInMode: 'prePay' }))} className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${config.dineInMode === 'prePay' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400'}`}>先結帳</button><button type="button" onClick={() => setConfig(p => ({ ...p, dineInMode: 'postPay' }))} className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${config.dineInMode === 'postPay' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400'}`}>後結帳</button></div></div></section>
+
+        <section>
+          <div className="flex justify-between items-center mb-6 px-1">
+            <div><h4 className="font-bold text-lg text-slate-700">內用結帳模式</h4><p className="text-xs text-slate-400 mt-1 font-medium">控制內用點餐是否需要立即付款</p></div>
+            <div className="bg-slate-100 p-1.5 rounded-2xl flex shadow-inner border border-slate-200">
+              <button onClick={() => setConfig(p => ({ ...p, dineInMode: 'prePay' }))} className={`px-8 py-3 rounded-xl text-sm font-black transition-all ${config?.dineInMode === 'prePay' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>先付款</button>
+              <button onClick={() => setConfig(p => ({ ...p, dineInMode: 'postPay' }))} className={`px-8 py-3 rounded-xl text-sm font-black transition-all ${config?.dineInMode === 'postPay' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>後付款</button>
+            </div>
+          </div>
+        </section>
+
         <hr className="border-slate-100" />
-        <section className="space-y-6"><h4 className="font-bold text-lg text-slate-700 flex items-center gap-2 px-1"><ShieldCheck size={20} className="text-blue-500" /> 收款管道設定</h4>
-          <div className="space-y-3">
+
+        <section className="space-y-8 font-sans">
+          <h4 className="font-bold text-lg text-slate-700 flex items-center gap-2 px-1 font-black uppercase tracking-tight"><ShieldCheck size={20} className="text-blue-500" /> 支付通路管理 Integration</h4>
+          <div className="space-y-4">
             {[
-              { id: 'enableCreditCard', label: '信用卡支付系統', desc: '啟用後結帳畫面將出現刷卡選項', icon: CreditCard },
-              { id: 'enableMobilePayment', label: '行動支付 (Apple/Line)', desc: '支援感應支付與條碼掃描付款', icon: Smartphone }
+              { id: 'enableCreditCard', label: '信用卡 / 感應', desc: '支援 VISA/MasterCard 信用卡刷卡結帳', icon: CreditCard },
+              { id: 'enableMobilePayment', label: '電子支付 / 掃碼', desc: '支援 Apple Pay, LINE Pay 及行動錢包支付', icon: Smartphone }
             ].map(opt => (
-              <div key={opt.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-[1.5rem] border border-slate-100/60 shadow-sm transition-all hover:bg-slate-100/40">
-                <div className="flex items-center gap-4 text-slate-400"><div className="p-2.5 bg-white rounded-xl shadow-sm text-blue-500"><opt.icon size={22} /></div>
-                  <div>
-                    <p className="text-sm font-black text-slate-800">{opt.label}</p>
-                    <p className="text-[10px] text-slate-400 font-medium">{opt.desc}</p>
-                  </div>
-                </div>
-                <button type="button" onClick={() => setConfig(p => ({ ...p, [opt.id]: !p[opt.id] }))} className={`w-16 h-8 rounded-full relative transition-all duration-300 ${config[opt.id] ? 'bg-blue-600' : 'bg-slate-300'}`}><div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ${config[opt.id] ? 'left-9' : 'left-1.5'} shadow-sm`}></div></button>
+              <div key={opt.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border border-slate-100/60 shadow-sm transition-all hover:bg-white hover:border-blue-100">
+                <div className="flex items-center gap-5"><div className="p-3.5 bg-white rounded-2xl shadow-sm text-blue-500 border border-slate-50"><opt.icon size={26} /></div><div><p className="text-base font-black text-slate-800">{opt.label}</p><p className="text-xs text-slate-400 font-medium mt-0.5 leading-relaxed">{opt.desc}</p></div></div>
+                <button onClick={() => setConfig(p => ({ ...p, [opt.id]: !p[opt.id] }))} className={`w-16 h-8 rounded-full relative transition-all duration-300 ${config?.[opt.id] ? 'bg-blue-600' : 'bg-slate-300'}`}><div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ${config?.[opt.id] ? 'left-9' : 'left-1.5'} shadow-md`}></div></button>
               </div>
             ))}
           </div>
