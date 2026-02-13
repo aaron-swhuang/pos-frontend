@@ -6,10 +6,34 @@ import {
   Clock, Search, Tag, Edit2, X, CheckCircle2, AlertCircle,
   ClipboardList, Wallet, Banknote, CreditCard, Smartphone,
   Delete, ShieldCheck, RotateCcw, AlertTriangle, Save, Ticket, Eye, EyeOff,
-  CalendarCheck, TrendingUp, Receipt, Database, Copy, Code, ChevronLeft, ChevronsLeft, ChevronsRight, ListFilter
+  CalendarCheck, TrendingUp, Receipt, Database, Copy, Code, ChevronLeft, ChevronsLeft, ChevronsRight, ListFilter, Info
 } from 'lucide-react';
 
-import { calculateFinalTotal, calculateDiscount, calculateChange, getUpdatedCart } from './utils/posLogic';
+// TODO: 在本地測試環境中，請取消下方的註解並移除「0. 核心業務邏輯」區塊，以恢復模組化架構。
+// import { calculateFinalTotal, calculateDiscount, calculateChange, getUpdatedCart } from './utils/posLogic';
+
+// --- 0. 核心業務邏輯 (TODO: 為了確保預覽環境運行暫時整合至此，未來應回歸外部 import) ---
+
+const calculateDiscount = (total, value, type) => {
+  if (type === 'percentage') {
+    // 假設 value 為 0.9 代表打 9 折，折扣金額為 10%
+    return Math.round(total * (1 - (value > 1 ? value / 100 : value)));
+  }
+  return value; // 定額折抵
+};
+
+const calculateFinalTotal = (total, discount) => Math.max(0, total - (parseFloat(discount) || 0));
+
+const calculateChange = (received, total) => (parseFloat(received) || 0) - total;
+
+// 模擬 getUpdatedCart 邏輯 (如外部邏輯有更複雜的實作請以此為準)
+const getUpdatedCart = (prevCart, newItem) => {
+  const existing = prevCart.find(i => i.id === newItem.id);
+  if (existing) {
+    return prevCart.map(i => i.id === newItem.id ? { ...i, quantity: i.quantity + 1 } : i);
+  }
+  return [...prevCart, { ...newItem, quantity: 1 }];
+};
 
 // --- 1. 全域資料管理中心 ---
 export const POSContext = createContext();
@@ -37,6 +61,46 @@ export const POSProvider = ({ children }) => {
     dineInMode: 'prePay', storeName: 'Smart POS', enableCreditCard: true, enableMobilePayment: true
   });
 
+  // 全局對話框狀態管理
+  const [modal, setModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: null,
+    onCancel: null,
+    confirmText: '確認',
+    cancelText: '取消'
+  });
+
+  const showAlert = (title, message, type = 'info') => {
+    setModal({
+      isOpen: true,
+      title,
+      message,
+      type,
+      confirmText: '我知道了',
+      onConfirm: () => setModal(prev => ({ ...prev, isOpen: false })),
+      onCancel: null
+    });
+  };
+
+  const showConfirm = (title, message, onConfirm, type = 'confirm') => {
+    setModal({
+      isOpen: true,
+      title,
+      message,
+      type,
+      confirmText: '確定執行',
+      cancelText: '取消返回',
+      onConfirm: () => {
+        if (onConfirm) onConfirm();
+        setModal(prev => ({ ...prev, isOpen: false }));
+      },
+      onCancel: () => setModal(prev => ({ ...prev, isOpen: false }))
+    });
+  };
+
   useEffect(() => {
     const hasLegacyVoided = orders.some(o => o.status === 'voided');
     if (hasLegacyVoided) {
@@ -57,10 +121,62 @@ export const POSProvider = ({ children }) => {
   return (
     <POSContext.Provider value={{
       menu, setMenu, orders, setOrders, dailySummaries, setDailySummaries,
-      discountRules, setDiscountRules, isLoggedIn, setIsLoggedIn, config, setConfig
+      discountRules, setDiscountRules, isLoggedIn, setIsLoggedIn, config, setConfig,
+      showAlert, showConfirm, modal
     }}>{children}</POSContext.Provider>
   );
 };
+
+// --- 1.1 全局對話框組件 ---
+const GlobalModal = () => {
+  const { modal } = useContext(POSContext);
+  if (!modal.isOpen) return null;
+
+  const getIcon = () => {
+    switch (modal.type) {
+      case 'danger': return <AlertTriangle className="text-red-500" size={32} />;
+      case 'success': return <CheckCircle2 className="text-green-500" size={32} />;
+      case 'confirm': return <HelpCircle className="text-blue-500" size={32} />;
+      default: return <Info className="text-blue-500" size={32} />;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="p-10 flex flex-col items-center text-center">
+          <div className={`p-4 rounded-2xl mb-6 ${modal.type === 'danger' ? 'bg-red-50' : modal.type === 'success' ? 'bg-green-50' : 'bg-blue-50'}`}>
+            {getIcon()}
+          </div>
+          <h3 className="text-2xl font-black text-slate-800 mb-2">{modal.title}</h3>
+          <p className="text-slate-500 font-medium leading-relaxed">{modal.message}</p>
+        </div>
+        <div className="flex border-t border-slate-100">
+          {modal.onCancel && (
+            <button
+              onClick={modal.onCancel}
+              className="flex-1 py-6 font-bold text-slate-400 hover:bg-slate-50 transition-colors border-r border-slate-100"
+            >
+              {modal.cancelText}
+            </button>
+          )}
+          <button
+            onClick={modal.onConfirm}
+            className={`flex-1 py-6 font-black transition-colors hover:opacity-90 ${modal.type === 'danger' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}
+          >
+            {modal.confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const HelpCircle = ({ size, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
 
 // --- 2. 組件：數字算盤 ---
 const Keypad = ({ onInput, onClear, onDelete }) => {
@@ -89,8 +205,8 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
 
   const numDiscount = parseFloat(discount) || 0;
   const numCash = parseFloat(cashReceived) || 0;
-  const finalTotal = Math.max(0, cartTotal - numDiscount);
-  const change = numCash - finalTotal;
+  const finalTotal = calculateFinalTotal(cartTotal, numDiscount);
+  const change = calculateChange(numCash, finalTotal);
 
   const handleKeypadInput = (val) => {
     if (focusField === 'cash') {
@@ -236,12 +352,15 @@ export const VoidReasonModal = ({ isOpen, onClose, onConfirm }) => {
 
 // --- 5. 頁面元件：登入 ---
 export const LoginPage = () => {
-  const { setIsLoggedIn } = useContext(POSContext);
+  const { setIsLoggedIn, showAlert } = useContext(POSContext);
   const [auth, setAuth] = useState({ user: '', pass: '' });
   const handleLogin = (e) => {
     e.preventDefault();
-    if (auth.user === 'admin' && auth.pass === '1234') setIsLoggedIn(true);
-    else alert('預設帳號 admin / 密碼 1234');
+    if (auth.user === 'admin' && auth.pass === '1234') {
+      setIsLoggedIn(true);
+    } else {
+      showAlert('登入失敗', '帳號或密碼錯誤。預設帳號為 admin，密碼為 1234。', 'danger');
+    }
   };
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
@@ -259,7 +378,7 @@ export const LoginPage = () => {
 
 // --- 6. 側邊導覽列 ---
 export const Sidebar = () => {
-  const { config, setIsLoggedIn } = useContext(POSContext);
+  const { config, setIsLoggedIn, showConfirm } = useContext(POSContext);
   const location = useLocation();
 
   const navItems = [
@@ -289,7 +408,10 @@ export const Sidebar = () => {
           </Link>
         ))}
       </div>
-      <button onClick={() => setIsLoggedIn(false)} className="m-6 p-4 flex items-center space-x-3 text-slate-500 hover:text-red-400 border-t border-slate-800 transition-colors shrink-0 font-bold">
+      <button
+        onClick={() => showConfirm('安全登出', '確定要登出系統嗎？未儲存的暫存資料可能會遺失。', () => setIsLoggedIn(false))}
+        className="m-6 p-4 flex items-center space-x-3 text-slate-500 hover:text-red-400 border-t border-slate-800 transition-colors shrink-0 font-bold"
+      >
         <LogOut size={20} /><span>安全登出</span>
       </button>
     </div>
@@ -298,7 +420,7 @@ export const Sidebar = () => {
 
 // --- 7. 前台收銀頁面 ---
 export const POSPage = () => {
-  const { menu, setOrders, orders, config } = useContext(POSContext);
+  const { menu, setOrders, orders, config, showConfirm } = useContext(POSContext);
   const [cart, setCart] = useState([]);
   const [orderType, setOrderType] = useState('dineIn');
   const [searchTerm, setSearchTerm] = useState('');
@@ -310,16 +432,20 @@ export const POSPage = () => {
   const filtered = menu.filter(item => (selectedCategory === '全部' || item.category === selectedCategory) && item.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const finalizeOrder = (data) => {
-    if (orderType === 'dineIn' && config.dineInMode === 'postPay' && !data.paymentMethod) {
-      if (!window.confirm("確定要送出此筆點餐清單並記錄為「待付款」嗎？")) return;
-    }
+    const handleFinalize = () => {
+      const pref = orderType === 'dineIn' ? 'D' : 'T';
+      const c = orders.filter(o => o.date === todayStr && o.orderType === orderType).length;
+      const orderNo = pref + (c + 1).toString().padStart(3, '0');
+      const newO = { id: Date.now(), orderNo, total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0), items: [...cart], orderType, date: todayStr, time: new Date().toLocaleTimeString(), status: 'unclosed', isVoided: false, paymentStatus: (orderType === 'dineIn' && config.dineInMode === 'postPay' && !data.paymentMethod) ? 'pending' : 'paid', ...data };
+      setOrders(prev => [...prev, newO]);
+      setCart([]); setIsCheckoutModalOpen(false);
+    };
 
-    const pref = orderType === 'dineIn' ? 'D' : 'T';
-    const c = orders.filter(o => o.date === todayStr && o.orderType === orderType).length;
-    const orderNo = pref + (c + 1).toString().padStart(3, '0');
-    const newO = { id: Date.now(), orderNo, total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0), items: [...cart], orderType, date: todayStr, time: new Date().toLocaleTimeString(), status: 'unclosed', isVoided: false, paymentStatus: (orderType === 'dineIn' && config.dineInMode === 'postPay' && !data.paymentMethod) ? 'pending' : 'paid', ...data };
-    setOrders(prev => [...prev, newO]);
-    setCart([]); setIsCheckoutModalOpen(false);
+    if (orderType === 'dineIn' && config.dineInMode === 'postPay' && !data.paymentMethod) {
+      showConfirm('送出點餐', '確定要送出此筆點餐清單並記錄為「待付款」嗎？', handleFinalize);
+    } else {
+      handleFinalize();
+    }
   };
 
   return (
@@ -332,7 +458,7 @@ export const POSPage = () => {
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 shrink-0 scrollbar-hide">{categories.map(c => (<button key={c} type="button" onClick={() => setSelectedCategory(c)} className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm border transition-all ${selectedCategory === c ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border-slate-100'}`}>{c}</button>))}</div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10 scrollbar-thin content-start">
           {filtered.map(item => (
-            <button key={item.id} type="button" onClick={() => { if (!item.isAvailable) return; setCart(prev => { const ex = prev.find(i => i.id === item.id); return ex ? prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i) : [...prev, { ...item, quantity: 1 }] }) }} className={`p-6 rounded-[2rem] shadow-sm border text-left group h-fit relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-500 hover:shadow-md' : 'bg-slate-50 opacity-60 grayscale'}`}>
+            <button key={item.id} type="button" onClick={() => { if (!item.isAvailable) return; setCart(prev => getUpdatedCart(prev, item)) }} className={`p-6 rounded-[2rem] shadow-sm border text-left group h-fit relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-500 hover:shadow-md' : 'bg-slate-50 opacity-60 grayscale'}`}>
               <div className="font-bold mb-1 truncate group-hover:text-blue-600 transition-colors">{item.name}</div><div className="font-black text-xl text-blue-600">${item.price}</div>
               {!item.isAvailable && <div className="absolute inset-0 bg-slate-900/5 flex items-center justify-center"><span className="bg-slate-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest shadow-sm">暫不供應</span></div>}
             </button>
@@ -438,13 +564,24 @@ export const OrderManagementPage = () => {
 
 // --- 9. 頁面元件：店務管理 ---
 export const AdminPage = () => {
-  const { menu, setMenu, discountRules, setDiscountRules } = useContext(POSContext);
+  const { menu, setMenu, discountRules, setDiscountRules, showConfirm } = useContext(POSContext);
   const [tab, setTab] = useState('menu');
   const [item, setItem] = useState({ name: '', price: '', category: '' });
   const [editId, setEditId] = useState(null);
   const [newDisc, setNewDisc] = useState({ name: '', type: 'percentage', value: '' });
-  const handleMenuSubmit = (e) => { e.preventDefault(); if (!item.name || !item.price || !item.category) return; if (editId) { setMenu(menu.map(i => i.id === editId ? { ...i, ...item, price: parseFloat(item.price) } : i)); setEditId(null); } else setMenu([...menu, { id: Date.now(), ...item, price: parseFloat(item.price), isAvailable: true }]); setItem({ name: '', price: '', category: '' }); };
-  const handleDiscountSubmit = (e) => { e.preventDefault(); if (!newDisc.name || !newDisc.value) return; setDiscountRules([...(discountRules || []), { id: Date.now(), ...newDisc, value: parseFloat(newDisc.value) }]); setNewDisc({ name: '', type: 'percentage', value: '' }); };
+
+  const handleMenuSubmit = (e) => {
+    e.preventDefault();
+    if (!item.name || !item.price || !item.category) return;
+    if (editId) {
+      setMenu(menu.map(i => i.id === editId ? { ...i, ...item, price: parseFloat(item.price) } : i));
+      setEditId(null);
+    } else {
+      setMenu([...menu, { id: Date.now(), ...item, price: parseFloat(item.price), isAvailable: true }]);
+    }
+    setItem({ name: '', price: '', category: '' });
+  };
+
   return (
     <div className="max-w-4xl h-full flex flex-col overflow-hidden text-slate-900">
       <div className="flex justify-between items-center mb-6 shrink-0">
@@ -464,7 +601,7 @@ export const AdminPage = () => {
                   <div className="flex gap-2 border-l pl-6 border-slate-100 text-slate-400">
                     <button type="button" onClick={() => setMenu(menu.map(m => m.id === i.id ? { ...m, isAvailable: !m.isAvailable } : m))} className="p-2">{i.isAvailable ? <Eye size={18} /> : <EyeOff size={18} />}</button>
                     <button type="button" onClick={() => { setEditId(i.id); setItem({ name: i.name, price: i.price.toString(), category: i.category }); }} className="p-2"><Edit2 size={18} /></button>
-                    <button type="button" onClick={() => setMenu(menu.filter(m => m.id !== i.id))} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                    <button type="button" onClick={() => showConfirm('刪除品項', `確定要從菜單中永久刪除「${i.name}」嗎？`, () => setMenu(menu.filter(m => m.id !== i.id)), 'danger')} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
                   </div>
                 </div>
               </div>
@@ -472,12 +609,12 @@ export const AdminPage = () => {
           </div>
         </>
       ) : (
-        <><form onSubmit={handleDiscountSubmit} className="bg-white p-6 rounded-3xl border border-slate-100 mb-6 shrink-0 shadow-sm"><div className="grid grid-cols-12 gap-4"><div className="col-span-5"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">方案名稱</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" value={newDisc.name} onChange={e => setNewDisc({ ...newDisc, name: e.target.value })} placeholder="例如：慶開幕8折" /></div><div className="col-span-3"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">類型</label><select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer" value={newDisc.type} onChange={e => setNewDisc({ ...newDisc, type: e.target.value })}><option value="percentage">折扣 (%)</option><option value="amount">折抵 ($)</option></select></div><div className="col-span-2"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">數值</label><input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={newDisc.value} onChange={e => setNewDisc({ ...newDisc, value: e.target.value })} /></div><div className="col-span-2 flex items-end"><button type="submit" className="w-full h-12 bg-blue-600 text-white rounded-xl font-bold shadow-lg active:scale-95">新增方案</button></div></div></form>
+        <><form onSubmit={(e) => { e.preventDefault(); if (!newDisc.name || !newDisc.value) return; setDiscountRules([...(discountRules || []), { id: Date.now(), ...newDisc, value: parseFloat(newDisc.value) }]); setNewDisc({ name: '', type: 'percentage', value: '' }); }} className="bg-white p-6 rounded-3xl border border-slate-100 mb-6 shrink-0 shadow-sm"><div className="grid grid-cols-12 gap-4"><div className="col-span-5"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">方案名稱</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" value={newDisc.name} onChange={e => setNewDisc({ ...newDisc, name: e.target.value })} placeholder="例如：慶開幕8折" /></div><div className="col-span-3"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">類型</label><select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer" value={newDisc.type} onChange={e => setNewDisc({ ...newDisc, type: e.target.value })}><option value="percentage">折扣 (%)</option><option value="amount">折抵 ($)</option></select></div><div className="col-span-2"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">數值</label><input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={newDisc.value} onChange={e => setNewDisc({ ...newDisc, value: e.target.value })} /></div><div className="col-span-2 flex items-end"><button type="submit" className="w-full h-12 bg-blue-600 text-white rounded-xl font-bold shadow-lg active:scale-95">新增方案</button></div></div></form>
           <div className="grid gap-3 overflow-y-auto flex-1 pr-2 pb-10 scrollbar-thin">
             {(discountRules || []).map(r => (
               <div key={r.id} className="bg-white px-6 py-4 rounded-2xl border border-slate-50 flex justify-between items-center shadow-sm">
                 <div className="flex items-center gap-4"><div className="p-2 bg-blue-50 rounded-lg text-blue-600"><Ticket size={18} /></div><div><div className="font-bold text-slate-800">{r.name}</div><div className="text-[10px] text-slate-400 uppercase">{r.type === 'percentage' ? '比例折扣' : '定額折抵'}</div></div></div>
-                <div className="flex items-center gap-6"><span className="font-black text-xl text-blue-600">${r.type === 'percentage' ? `${Math.round(r.value * 100)}%` : `-$${r.value}`}</span><button type="button" onClick={() => setDiscountRules(discountRules.filter(it => it.id !== r.id))} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button></div>
+                <div className="flex items-center gap-6"><span className="font-black text-xl text-blue-600">${r.type === 'percentage' ? `${Math.round(r.value * 100)}%` : `-$${r.value}`}</span><button type="button" onClick={() => showConfirm('刪除方案', `確定要刪除「${r.name}」優惠方案嗎？`, () => setDiscountRules(discountRules.filter(it => it.id !== r.id)), 'danger')} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button></div>
               </div>
             ))}
           </div>
@@ -489,7 +626,7 @@ export const AdminPage = () => {
 
 // --- 10. 頁面元件：報表分析 ---
 export const DashboardPage = () => {
-  const { orders, dailySummaries, setDailySummaries, setOrders } = useContext(POSContext);
+  const { orders, dailySummaries, setDailySummaries, setOrders, showAlert, showConfirm } = useContext(POSContext);
   const [expandOrderId, setExpandOrderId] = useState(null);
   const [expandSummaryId, setExpandSummaryId] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -508,53 +645,39 @@ export const DashboardPage = () => {
     );
 
     if (pendingOrders.length > 0) {
-      alert(`還有 ${pendingOrders.length} 筆「待收款」單據未處理，請先收款或作廢再執行日結。`);
+      showAlert('無法執行日結', `目前還有 ${pendingOrders.length} 筆「待收款」單據未處理。`, 'danger');
       return;
     }
 
-    if (!window.confirm("確定要執行日結結算嗎？結算後的訂單將移至歷史報表。")) return;
-
-    const grouped = orders.filter(o => o.status === 'unclosed').reduce((acc, order) => {
-      const date = order.date;
-      if (!acc[date]) {
-        acc[date] = {
-          id: Date.now() + Math.random(),
-          date,
-          total: 0,
-          orderCount: 0,
-          voidedCount: 0,
-          closedAt: new Date().toLocaleString(),
-          itemSales: {},
-          typeCount: { dineIn: 0, takeOut: 0 },
-          relatedOrders: []
-        };
+    showConfirm(
+      '執行日結結算',
+      '確定要結束今日班次嗎？結算後的訂單將會封存。',
+      () => {
+        const grouped = orders.filter(o => o.status === 'unclosed').reduce((acc, order) => {
+          const date = order.date;
+          if (!acc[date]) {
+            acc[date] = { id: Date.now() + Math.random(), date, total: 0, orderCount: 0, voidedCount: 0, closedAt: new Date().toLocaleString(), itemSales: {}, typeCount: { dineIn: 0, takeOut: 0 }, relatedOrders: [] };
+          }
+          if (order.isVoided) acc[date].voidedCount += 1;
+          else {
+            acc[date].total += order.total;
+            acc[date].orderCount += 1;
+            acc[date].typeCount[order.orderType || 'dineIn'] += 1;
+            order.items?.forEach(item => { acc[date].itemSales[item.name] = (acc[date].itemSales[item.name] || 0) + (item.quantity || 1); });
+          }
+          acc[date].relatedOrders.push(order);
+          return acc;
+        }, {});
+        setDailySummaries([...dailySummaries, ...Object.values(grouped)]);
+        setOrders(orders.map(o => o.status === 'unclosed' ? { ...o, status: 'closed' } : o));
+        showAlert('日結完成', '今日數據已彙整成功。', 'success');
       }
-
-      if (order.isVoided) {
-        acc[date].voidedCount += 1;
-      } else {
-        acc[date].total += order.total;
-        acc[date].orderCount += 1;
-        acc[date].typeCount[order.orderType || 'dineIn'] += 1;
-        order.items?.forEach(item => {
-          acc[date].itemSales[item.name] = (acc[date].itemSales[item.name] || 0) + (item.quantity || 1);
-        });
-      }
-      acc[date].relatedOrders.push(order);
-      return acc;
-    }, {});
-
-    setDailySummaries([...dailySummaries, ...Object.values(grouped)]);
-    setOrders(orders.map(o => o.status === 'unclosed' ? { ...o, status: 'closed' } : o));
-    alert("日結作業完成！");
+    );
   };
 
   const renderItemDetails = (items) => (items || []).map((item, idx) => (
     <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
-      <div className="flex flex-col">
-        <span className="text-slate-700 font-medium text-sm">{item.name}</span>
-        <span className="text-[10px] text-slate-400 font-mono italic">單價 ${item.price} x {item.quantity || 1}</span>
-      </div>
+      <div className="flex flex-col"><span className="text-slate-700 font-medium text-sm">{item.name}</span><span className="text-[10px] text-slate-400 font-mono italic">單價 ${item.price} x {item.quantity || 1}</span></div>
       <span className="font-bold text-sm text-slate-900">${(item.price || 0) * (item.quantity || 1)}</span>
     </div>
   ));
@@ -563,7 +686,7 @@ export const DashboardPage = () => {
     <div className="max-w-5xl h-full flex flex-col overflow-hidden text-slate-900">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 shrink-0">
         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-3xl text-white shadow-xl flex flex-col justify-between min-h-[220px]">
-          <div><p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2">目前累計營營收 (未日結)</p><h3 className="text-5xl font-black">${totalRevenue}</h3></div>
+          <div><p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2">目前累計營收 (未日結)</p><h3 className="text-5xl font-black">${totalRevenue}</h3></div>
           <button type="button" onClick={handleDailyClosing} className="mt-6 flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 px-6 py-3 rounded-xl font-bold border border-white/30"><CalendarCheck size={20} /><span>執行日結結帳</span></button>
         </div>
         <div className="bg-white p-10 rounded-3xl border border-slate-100 flex flex-col justify-center shadow-sm">
@@ -590,7 +713,7 @@ export const DashboardPage = () => {
                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center"><span className="text-xs uppercase font-bold block mb-1 text-slate-400">異常統計</span><span className="text-2xl font-black text-red-500">{summary.voidedCount || 0}</span><span className="text-[10px] mt-2 italic text-slate-400">作廢訂單數</span></div></div><div className="border-t border-slate-200 pt-8"><h4 className="text-sm font-bold mb-4 flex items-center text-slate-900"><Receipt size={16} className="mr-2 text-blue-500" /> 原始訂單明細 (含作廢)</h4><div className="space-y-2">{(summary.relatedOrders || []).map((order) => { const isOrderExpand = expandOrderId === order.id; return (<div key={order.id} className={`bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm ${order.isVoided ? 'opacity-40 grayscale' : ''}`}><div onClick={(e) => { e.stopPropagation(); setExpandOrderId(isOrderExpand ? null : order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors"><div className="flex flex-col flex-1"><span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>號碼 #{order.orderNo || 'N/A'}</span><span className="text-[10px] text-slate-400">{order.time}</span></div><div className="flex-1">{order.isVoided ? <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">已作廢</span> : (order.orderType === 'takeOut' ? <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold">外帶</span> : <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-1 rounded-md font-bold">內用</span>)}</div><div className="text-lg font-black mr-4 text-slate-800">${order.total}</div><ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} /></div>{isOrderExpand && (<div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in">{renderItemDetails(order.items)}</div>)}</div>); })}</div></div></div>)}</div>))}</div>
         ) : (
           <div className="space-y-3">
-            {orders.filter(o => o.status === 'unclosed').reverse().map(order => (<div key={order.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${order.isVoided ? 'opacity-30' : 'border-blue-200 shadow-blue-50'}`}><div onClick={() => setExpandOrderId(expandOrderId === order.id ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900"><div className="flex-1"><div className="font-bold flex items-center text-slate-700">#{order.orderNo || 'N/A'} - {order.date} <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}</span>{order.paymentStatus === 'pending' && !order.isVoided && <span className="ml-2 text-[10px] bg-amber-100 text-amber-600 px-2 py-0.5 rounded font-bold italic">待付款</span>}</div><div className="text-xs font-mono italic text-slate-400">ID: {order.id} {order.isVoided && `| 原因: ${order.voidReason}`}</div></div><div className={`text-xl font-black mr-6 ${order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}`}>${order.total}</div><ChevronRight className={`text-slate-300 transition-transform ${expandOrderId === order.id ? 'rotate-90' : ''}`} /></div>{expandOrderId === order.id && <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in"><div className="space-y-2">{renderItemDetails(order.items)}</div><div className="mt-4 pt-4 border-t flex justify-between font-black"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div></div>}</div>))}
+            {orders.filter(o => o.status === 'unclosed').reverse().map(order => (<div key={order.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${order.isVoided ? 'opacity-30' : 'border-blue-200 shadow-blue-50'}`}><div onClick={() => setExpandOrderId(expandOrderId === order.id ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900"><div className="flex-1"><div className="font-bold flex items-center text-slate-700">#{order.orderNo || 'N/A'} - {order.date} <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}</span></div><div className="text-xs font-mono italic text-slate-400">ID: {order.id} {order.isVoided && `| 原因: ${order.voidReason}`}</div></div><div className={`text-xl font-black mr-6 ${order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}`}>${order.total}</div><ChevronRight className={`text-slate-300 transition-transform ${expandOrderId === order.id ? 'rotate-90' : ''}`} /></div>{expandOrderId === order.id && <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in"><div className="space-y-2">{renderItemDetails(order.items)}</div><div className="mt-4 pt-4 border-t flex justify-between font-black"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div></div>}</div>))}
           </div>
         )}
       </div>
@@ -598,23 +721,20 @@ export const DashboardPage = () => {
   );
 };
 
-// --- 11. 頁面元件：原始數據檢視 (導入展開式明細與分頁優化) ---
+// --- 11. 頁面元件：原始數據檢視 ---
 export const DatabaseViewPage = () => {
-  const { orders } = useContext(POSContext);
+  const { orders, showAlert } = useContext(POSContext);
   const [search, setSearch] = useState('');
   const [viewJson, setViewJson] = useState(null);
-  const [expandedId, setExpandedId] = useState(null); // 控制展開哪一列明細
+  const [expandedId, setExpandedId] = useState(null);
 
-  // 分頁相關 State
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // 當搜尋條件改變時，重設頁碼到第一頁
   useEffect(() => {
     setCurrentPage(1);
   }, [search, pageSize]);
 
-  // 1. 執行過濾 (支援搜尋編號或商品名稱)
   const filteredOrders = useMemo(() => {
     const s = search.toLowerCase();
     return [...orders].reverse().filter(o =>
@@ -625,10 +745,7 @@ export const DatabaseViewPage = () => {
     );
   }, [orders, search]);
 
-  // 2. 計算總頁數
   const totalPages = Math.ceil(filteredOrders.length / pageSize);
-
-  // 3. 取得當前分頁資料
   const paginatedOrders = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredOrders.slice(start, start + pageSize);
@@ -639,96 +756,45 @@ export const DatabaseViewPage = () => {
     el.value = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
     document.body.appendChild(el); el.select();
     document.execCommand('copy'); document.body.removeChild(el);
-    alert('已複製到剪貼簿');
+    showAlert('複製成功', '數據已複製到剪貼簿。', 'success');
   };
 
   return (
     <div className="max-w-full h-full flex flex-col overflow-hidden text-slate-900 px-2">
       <div className="flex justify-between items-center mb-6 shrink-0">
-        <div>
-          <h2 className="text-2xl font-black flex items-center gap-2">
-            <Database className="text-blue-600" /> 原始數據檢視
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">開發者專用：點擊單列可查看商品明細，支援 JSON 導出</p>
-        </div>
+        <div><h2 className="text-2xl font-black flex items-center gap-2"><Database className="text-blue-600" /> 原始數據檢視</h2><p className="text-xs text-slate-400 mt-1">開發者專用：支援分頁與 JSON 導出</p></div>
         <div className="flex gap-2">
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input
-              type="text"
-              placeholder="搜尋單號、日期、ID或商品名稱..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm focus:ring-2 focus:ring-blue-500 transition-all"
-            />
-          </div>
-          <button
-            onClick={() => copyToClipboard(orders)}
-            className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"
-          >
-            <Copy size={14} /> 導出全部
-          </button>
+          <div className="relative w-72"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="搜尋、日期、ID或商品名..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm" /></div>
+          <button onClick={() => copyToClipboard(orders)} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-slate-800"><Copy size={14} /> 導出全部</button>
         </div>
       </div>
 
       <div className="flex-1 overflow-hidden bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col mb-4">
-        {/* 表格容器 */}
         <div className="overflow-x-auto flex-1 scrollbar-thin">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10 shadow-sm">
               <tr>
-                <th className="p-4 font-black uppercase text-slate-400 w-12 text-center">#</th>
-                <th className="p-4 font-black uppercase text-slate-400">OrderNo</th>
-                <th className="p-4 font-black uppercase text-slate-400">Date/Time</th>
-                <th className="p-4 font-black uppercase text-slate-400">Status</th>
-                <th className="p-4 font-black uppercase text-slate-400 text-right">Total</th>
-                <th className="p-4 font-black uppercase text-slate-400 text-center">Items</th>
-                <th className="p-4 font-black uppercase text-slate-400 text-center">Payment</th>
-                <th className="p-4 font-black uppercase text-slate-400 text-right">JSON</th>
+                <th className="p-4 font-black text-slate-400 w-12 text-center">#</th>
+                <th className="p-4 font-black text-slate-400">OrderNo</th>
+                <th className="p-4 font-black text-slate-400">Date/Time</th>
+                <th className="p-4 font-black text-slate-400">Status</th>
+                <th className="p-4 font-black text-slate-400 text-right">Total</th>
+                <th className="p-4 font-black text-slate-400 text-center">Payment</th>
+                <th className="p-4 font-black text-slate-400 text-right">JSON</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedOrders.map(o => (
                 <React.Fragment key={o.id}>
-                  {/* 主要資料列 */}
-                  <tr
-                    onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}
-                    className={`cursor-pointer transition-colors ${expandedId === o.id ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'}`}
-                  >
-                    <td className="p-4 text-center">
-                      <ChevronRight size={14} className={`text-slate-300 transition-transform ${expandedId === o.id ? 'rotate-90 text-blue-500' : ''}`} />
-                    </td>
-                    <td className="p-4"><span className="font-bold text-slate-700">#{o.orderNo}</span></td>
+                  <tr onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`cursor-pointer transition-colors ${expandedId === o.id ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'}`}>
+                    <td className="p-4 text-center"><ChevronRight size={14} className={`text-slate-300 transition-transform ${expandedId === o.id ? 'rotate-90 text-blue-500' : ''}`} /></td>
+                    <td className="p-4 font-bold text-slate-700">#{o.orderNo}</td>
                     <td className="p-4 text-slate-500 font-medium">{o.date} <span className="text-[10px] text-slate-300 ml-1">{o.time}</span></td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${o.status === 'closed' ? 'bg-slate-400' : 'bg-green-500'}`} />
-                        <span className={`font-bold uppercase text-[9px] ${o.status === 'closed' ? 'text-slate-400' : 'text-green-600'}`}>{o.status}</span>
-                      </div>
-                    </td>
+                    <td className="p-4"><span className={`font-bold uppercase text-[9px] ${o.status === 'closed' ? 'text-slate-400' : 'text-green-600'}`}>{o.status}</span></td>
                     <td className={`p-4 text-right font-black ${o.isVoided ? 'text-slate-300 line-through' : 'text-slate-900'}`}>${o.total}</td>
-                    <td className="p-4 text-center">
-                      <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-bold text-[9px]">{o.items?.length || 0} 品項</span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className={`font-black text-[9px] px-2 py-0.5 rounded ${o.isVoided ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
-                          {o.isVoided ? 'VOID' : (o.paymentMethod || 'PAY')}
-                        </span>
-                        <span className="text-[8px] text-slate-300 uppercase font-bold">{o.paymentStatus}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setViewJson(o); }}
-                        className="p-1.5 text-slate-300 hover:text-blue-500 transition-colors"
-                      >
-                        <Code size={14} />
-                      </button>
-                    </td>
+                    <td className="p-4 text-center"><span className={`font-black text-[9px] px-2 py-0.5 rounded ${o.isVoided ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>{o.isVoided ? 'VOID' : (o.paymentMethod || 'PAY')}</span></td>
+                    <td className="p-4 text-right"><button onClick={(e) => { e.stopPropagation(); setViewJson(o); }} className="p-1.5 text-slate-300 hover:text-blue-500"><Code size={14} /></button></td>
                   </tr>
-
-                  {/* 展開的明細列 */}
                   {expandedId === o.id && (
                     <tr className="bg-blue-50/20">
                       <td colSpan="8" className="p-0 border-b border-blue-100">
@@ -737,6 +803,40 @@ export const DatabaseViewPage = () => {
                           <div className="space-y-3">
                             <h4 className="text-[10px] font-black text-blue-500 uppercase flex items-center gap-2 mb-2">
                               <Receipt size={12} /> 訂單內容明細
+                            </h4>
+                            <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden shadow-sm">
+                              <table className="w-full text-[11px]">
+                                <thead className="bg-slate-50 border-b border-slate-100">
+                                  <tr>
+                                    <th className="p-2 text-slate-400 font-bold">商品名稱</th>
+                                    <th className="p-2 text-right text-slate-400 font-bold">單價</th>
+                                    <th className="p-2 text-center text-slate-400 font-bold">數量</th>
+                                    <th className="p-2 text-right text-slate-400 font-bold">小計</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                  {o.items?.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-blue-50/10">
+                                      <td className="p-2 font-bold text-slate-600">{item.name}</td>
+                                      <td className="p-2 text-right text-slate-400">${item.price}</td>
+                                      <td className="p-2 text-center font-bold text-slate-500">x{item.quantity}</td>
+                                      <td className="p-2 text-right font-black text-slate-700">${item.price * item.quantity}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot className="bg-blue-50/30 font-black">
+                                  <tr>
+                                    <td colSpan="3" className="p-2 text-right text-blue-600">應收總額</td>
+                                    <td className="p-2 text-right text-blue-600 text-sm">${o.total}</td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </div>
+                          {/* 右側：元數據摘要 */}
+                          <div className="space-y-4">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-2">
+                              <ListFilter size={12} /> 系統元數據 (Meta)
                             </h4>
                             <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden shadow-sm">
                               <table className="w-full text-[11px]">
@@ -813,7 +913,6 @@ export const DatabaseViewPage = () => {
           <div className="text-[11px] font-bold text-slate-400 uppercase">
             顯示 {filteredOrders.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, filteredOrders.length)} 筆，共 {filteredOrders.length} 筆
           </div>
-
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-[10px] font-black text-slate-400 uppercase">每頁顯示</label>
@@ -825,7 +924,6 @@ export const DatabaseViewPage = () => {
                 {[10, 25, 50, 100].map(val => <option key={val} value={val}>{val}</option>)}
               </select>
             </div>
-
             <div className="flex items-center gap-1">
               <button disabled={currentPage === 1} onClick={() => setCurrentPage(1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronsLeft size={16} /></button>
               <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronLeft size={16} /></button>
@@ -839,18 +937,11 @@ export const DatabaseViewPage = () => {
         </div>
       </div>
 
-      {/* JSON 檢視浮窗 (保持不變) */}
       {viewJson && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden zoom-in-95">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-              <h3 className="font-black text-lg">訂單原始 JSON - #{viewJson.orderNo}</h3>
-              <div className="flex gap-2">
-                <button onClick={() => copyToClipboard(viewJson)} className="p-2 hover:bg-blue-100 text-blue-600 rounded-xl transition-all"><Copy size={20} /></button>
-                <button onClick={() => setViewJson(null)} className="p-2 hover:bg-red-100 text-red-500 rounded-xl transition-all"><X size={20} /></button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto p-6 bg-slate-900"><pre className="text-green-400 font-mono text-xs whitespace-pre-wrap leading-relaxed">{JSON.stringify(viewJson, null, 2)}</pre></div>
+          <div className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50"><h3 className="font-black text-lg">原始 JSON - #{viewJson.orderNo}</h3><button onClick={() => setViewJson(null)} className="p-2 hover:bg-red-100 text-red-500 rounded-xl"><X size={20} /></button></div>
+            <div className="flex-1 overflow-auto p-6 bg-slate-900"><pre className="text-green-400 font-mono text-xs whitespace-pre-wrap">{JSON.stringify(viewJson, null, 2)}</pre></div>
           </div>
         </div>
       )}
@@ -860,24 +951,26 @@ export const DatabaseViewPage = () => {
 
 // --- 12. 系統設定 ---
 export const SettingsPage = () => {
-  const { config, setConfig } = useContext(POSContext);
+  const { config, setConfig, showAlert } = useContext(POSContext);
   const [isEdit, setIsEdit] = useState(false);
   const [temp, setTemp] = useState(config.storeName);
-  const handleSave = () => { setConfig(p => ({ ...p, storeName: temp })); setIsEdit(false); };
+  const handleSave = () => { setConfig(p => ({ ...p, storeName: temp })); setIsEdit(false); showAlert('儲存成功', 'success'); };
   return (
-    <div className="max-w-2xl h-full flex flex-col overflow-hidden text-slate-900">
+    <div className="max-w-2xl h-full flex flex-col pb-32 text-slate-900">
       <h2 className="text-2xl font-black text-slate-800 mb-8 px-2">系統參數設定</h2>
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 space-y-10">
         <div className="bg-blue-50 p-4 rounded-2xl flex items-center gap-3 text-blue-600 mb-2"><AlertCircle size={20} /><span className="text-sm font-bold">提醒：在此更改的所有設定將立即生效。</span></div>
         <section>
           <div className="flex justify-between items-center mb-4 text-slate-400 px-1"><label className="text-xs font-black uppercase tracking-widest">店舖名稱</label>
-            {!isEdit ? <button type="button" onClick={() => { setIsEdit(true); setTemp(config.storeName) }} className="text-blue-600 text-xs font-bold flex items-center gap-1.5 hover:underline"><Edit2 size={12} /> 修改店名</button>
-              : <div className="flex gap-5"><button type="button" onClick={handleSave} className="text-green-600 text-xs font-black flex items-center gap-1.5"><Save size={14} /> 儲存</button><button type="button" onClick={() => setIsEdit(false)} className="text-slate-400 text-xs font-bold">取消</button></div>}
+            {!isEdit ? <button type="button" onClick={() => { setIsEdit(true); setTemp(config?.storeName) }} className="text-blue-600 text-xs font-bold flex items-center gap-1.5 hover:underline"><Edit2 size={12} /> 修改店名</button>
+              : <div className="flex gap-5"><button type="button" onClick={handleSave} className="text-green-600 text-xs font-black flex items-center gap-1.5"><Save size={14} /> 儲存</button><button type="button" onClick={() => setIsEdit(false)} className="text-slate-400 text-xs font-bold">取消</button></div>
+            }
           </div>
           <div className={`transition-all rounded-2xl ${isEdit ? 'ring-4 ring-blue-50 border-blue-500 shadow-lg' : 'border-slate-100'}`}><input type="text" disabled={!isEdit} className={`w-full px-6 py-4 border rounded-2xl outline-none font-black text-xl transition-all ${!isEdit ? 'bg-slate-50 text-slate-500 border-transparent cursor-not-allowed' : 'bg-white text-slate-900 border-blue-500'}`} value={temp} onChange={e => setTemp(e.target.value)} /></div>
         </section>
         <hr className="border-slate-100" />
-        <section><div className="flex justify-between items-center mb-6 px-1"><div><h4 className="font-bold text-lg text-slate-700">內用結帳流程</h4><p className="text-xs text-slate-400 mt-0.5">決定點餐後是否需立即完成付款</p></div><div className="bg-slate-100 p-1.5 rounded-2xl flex shadow-inner"><button type="button" onClick={() => setConfig(p => ({ ...p, dineInMode: 'prePay' }))} className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${config.dineInMode === 'prePay' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400'}`}>先結帳</button><button type="button" onClick={() => setConfig(p => ({ ...p, dineInMode: 'postPay' }))} className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${config.dineInMode === 'postPay' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400'}`}>後結帳</button></div></div></section>
+        <section><div className="flex justify-between items-center mb-6 px-1"><div><h4 className="font-bold text-lg text-slate-700">內用結帳流程</h4><p className="text-xs text-slate-400 mt-0.5">決定點餐後是否需立
+          即完成付款</p></div><div className="bg-slate-100 p-1.5 rounded-2xl flex shadow-inner"><button type="button" onClick={() => setConfig(p => ({ ...p, dineInMode: 'prePay' }))} className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${config.dineInMode === 'prePay' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400'}`}>先結帳</button><button type="button" onClick={() => setConfig(p => ({ ...p, dineInMode: 'postPay' }))} className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${config.dineInMode === 'postPay' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400'}`}>後結帳</button></div></div></section>
         <hr className="border-slate-100" />
         <section className="space-y-6"><h4 className="font-bold text-lg text-slate-700 flex items-center gap-2 px-1"><ShieldCheck size={20} className="text-blue-500" /> 收款管道設定</h4>
           <div className="space-y-3">
@@ -898,7 +991,7 @@ export const SettingsPage = () => {
 const MainLayout = () => (
   <div className="flex min-h-screen bg-slate-50 text-slate-900">
     <Sidebar />
-    <main className="flex-1 ml-64 p-10 h-screen overflow-hidden">
+    <main className="flex-1 ml-64 p-10 h-screen overflow-y-auto relative">
       <Routes>
         <Route path="/pos" element={<POSPage />} />
         <Route path="/orders" element={<OrderManagementPage />} />
@@ -908,13 +1001,19 @@ const MainLayout = () => (
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/pos" />} />
       </Routes>
+      <GlobalModal />
     </main>
   </div>
 );
 
 const AppContent = () => {
   const { isLoggedIn } = useContext(POSContext);
-  return isLoggedIn ? <MainLayout /> : <LoginPage />;
+  return isLoggedIn ? <MainLayout /> : (
+    <>
+      <LoginPage />
+      <GlobalModal />
+    </>
+  );
 };
 
 export default function App() {
