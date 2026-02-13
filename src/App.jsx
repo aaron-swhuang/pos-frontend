@@ -182,17 +182,17 @@ const HelpCircle = ({ size, className }) => (
 const Keypad = ({ onInput, onClear, onDelete }) => {
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '00', '.'];
   return (
-    <div className="grid grid-cols-3 gap-1">
+    <div className="grid grid-cols-3 gap-2">
       {keys.map(key => (
-        <button key={key} type="button" onClick={() => onInput(key)} className="h-10 lg:h-11 rounded-xl bg-white border border-slate-200 shadow-sm text-lg font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all">{key}</button>
+        <button key={key} type="button" onClick={() => onInput(key)} className="h-12 rounded-xl bg-white border border-slate-200 shadow-sm text-xl font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all">{key}</button>
       ))}
-      <button type="button" onClick={onClear} className="h-10 lg:h-11 rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100 text-xs uppercase">AC</button>
-      <button type="button" onClick={onDelete} className="h-10 lg:h-11 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200"><Delete size={18} /></button>
+      <button type="button" onClick={onClear} className="h-12 rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100 text-sm uppercase">AC</button>
+      <button type="button" onClick={onDelete} className="h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200"><Delete size={20} /></button>
     </div>
   );
 };
 
-// --- 3. 結帳確認視窗 ---
+// --- 3. 結帳確認視窗 (佈局修正：縮減間距以避免溢出) ---
 export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) => {
   const { config, discountRules } = useContext(POSContext);
   const [discount, setDiscount] = useState('0');
@@ -228,91 +228,99 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
   };
 
   const options = [
-    { id: 'Cash', label: '現金', icon: <Banknote size={18} />, enabled: true },
-    { id: 'Credit', label: '刷卡', icon: <CreditCard size={18} />, enabled: config.enableCreditCard },
-    { id: 'Mobile', label: '支付', icon: <Smartphone size={18} />, enabled: config.enableMobilePayment }
+    { id: 'Cash', label: '現金', icon: <Banknote size={22} />, enabled: true },
+    { id: 'Credit', label: '刷卡', icon: <CreditCard size={22} />, enabled: config.enableCreditCard },
+    { id: 'Mobile', label: '支付', icon: <Smartphone size={22} />, enabled: config.enableMobilePayment }
   ].filter(opt => opt.enabled);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 text-slate-800">
-      <div className="bg-white w-full max-w-5xl rounded-[2rem] shadow-2xl flex flex-col lg:flex-row overflow-hidden max-h-[92vh]">
-        <div className="lg:w-[32%] bg-slate-50 p-5 border-r border-slate-200 flex flex-col justify-between overflow-hidden">
+      <div className="bg-white w-full max-w-6xl rounded-[2.5rem] shadow-2xl flex flex-col lg:flex-row overflow-hidden max-h-[92vh]">
+        {/* 左側資訊區 */}
+        <div className="lg:w-[35%] bg-slate-50 p-8 border-r border-slate-200 flex flex-col justify-between overflow-hidden">
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            <h3 className="text-lg font-bold mb-3">結帳內容確認</h3>
-            <div className="bg-white/70 rounded-xl border border-slate-100 p-2 overflow-y-auto flex-1">
+            <h3 className="text-xl font-black mb-5 text-slate-800">結帳內容確認</h3>
+            <div className="bg-white/70 rounded-2xl border border-slate-200 p-4 overflow-y-auto flex-1 shadow-inner">
               {(items || []).map((item, idx) => (
-                <div key={idx} className="flex justify-between text-[11px] text-slate-600 border-b border-slate-50 py-1 last:border-0">
-                  <span className="truncate max-w-[65%] font-medium">{item.name} x{item.quantity}</span>
-                  <span className="font-bold">${item.price * item.quantity}</span>
+                <div key={idx} className="flex justify-between text-sm text-slate-600 border-b border-slate-100 py-3 last:border-0">
+                  <span className="truncate max-w-[70%] font-semibold">{item.name} x{item.quantity}</span>
+                  <span className="font-bold text-slate-900">${item.price * item.quantity}</span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="space-y-1.5 mt-3 pt-3 border-t border-slate-200 shrink-0">
-            <div className="flex justify-between text-[11px] text-slate-500 font-bold"><span>原價小計</span><span>${cartTotal}</span></div>
-            <div onClick={() => setFocusField('discount')} className={`flex justify-between p-2 rounded-lg border transition-all cursor-pointer ${focusField === 'discount' ? 'border-blue-500 bg-white ring-2 ring-blue-50' : 'border-slate-200 bg-white/40'}`}>
-              <span className="text-[10px] font-bold text-slate-400">優惠折抵 {discountName && `(${discountName})`}</span>
-              <span className="text-sm font-black text-red-500">-${discount}</span>
+          <div className="space-y-3 mt-6 pt-6 border-t border-slate-200 shrink-0">
+            <div className="flex justify-between text-xs text-slate-400 font-bold uppercase tracking-widest"><span>原價小計</span><span>${cartTotal}</span></div>
+            <div onClick={() => setFocusField('discount')} className={`flex justify-between p-4 rounded-xl border transition-all cursor-pointer ${focusField === 'discount' ? 'border-blue-500 bg-white ring-4 ring-blue-50 shadow-md' : 'border-slate-200 bg-white/40'}`}>
+              <span className="text-xs font-black text-slate-400 uppercase">優惠折抵 {discountName && `(${discountName})`}</span>
+              <span className="text-lg font-black text-red-500">-${discount}</span>
             </div>
-            <div className="flex justify-between items-end pt-1">
-              <span className="text-xs font-bold text-slate-400 uppercase">應收總額</span>
-              <span className="text-4xl font-black text-blue-600">${finalTotal}</span>
+            <div className="flex justify-between items-end pt-2">
+              <span className="text-sm font-black text-slate-400 uppercase tracking-tighter">應收總額</span>
+              <span className="text-5xl font-black text-blue-600 tracking-tight">${finalTotal}</span>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 p-5 flex flex-col bg-white overflow-hidden justify-between">
-          <div className="space-y-4">
+        {/* 右側操作區 */}
+        <div className="flex-1 p-8 flex flex-col bg-white overflow-hidden justify-between">
+          <div className="space-y-6">
             <div>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">1. 選擇支付方式</h3>
-              <div className="grid grid-cols-3 gap-2">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-1">1. 選擇支付方式</h3>
+              <div className="grid grid-cols-3 gap-3">
                 {options.map(opt => (
-                  <button key={opt.id} type="button" onClick={() => setPaymentMethod(opt.id)} className={`flex flex-col items-center justify-center py-2.5 rounded-xl border-2 transition-all gap-1 ${paymentMethod === opt.id ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-sm' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
-                    {opt.icon}<span className="font-bold text-[10px] uppercase">{opt.label}</span>
+                  <button key={opt.id} type="button" onClick={() => setPaymentMethod(opt.id)} className={`flex flex-col items-center justify-center py-4 rounded-2xl border-2 transition-all gap-2 ${paymentMethod === opt.id ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-md scale-[1.02]' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                    {opt.icon}<span className="font-black text-xs uppercase">{opt.label}</span>
                   </button>
                 ))}
               </div>
             </div>
+
             <div>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">2. 套用優惠方案</h3>
-              <div className="flex gap-1.5 flex-wrap px-1">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-1">2. 套用優惠方案</h3>
+              <div className="flex gap-2 flex-wrap px-1">
                 {discountRules.map(rule => (
                   <button key={rule.id} type="button" onClick={() => {
                     const val = calculateDiscount(cartTotal, rule.value, rule.type);
                     setDiscount(val.toString()); setDiscountName(rule.name);
-                  }} className={`px-2.5 py-1.5 rounded-lg border text-[9px] font-black transition-all flex items-center gap-1 ${discountName === rule.name ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 text-slate-500 border-slate-200'}`}><Ticket size={10} />{rule.name}</button>
+                  }} className={`px-4 py-2 rounded-xl border text-[11px] font-black transition-all flex items-center gap-1.5 ${discountName === rule.name ? 'bg-blue-600 text-white border-blue-600 shadow-md scale-105' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-blue-300'}`}><Ticket size={12} />{rule.name}</button>
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2 flex flex-col justify-center">
-                <h3 className="text-xs font-bold text-slate-400 uppercase mb-1 px-1">3. 輸入收受金額</h3>
+
+            {/* 第三區塊：修正重疊且避免溢出 */}
+            <div className="grid grid-cols-2 gap-8 items-start">
+              <div className="flex flex-col">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">3. 收受金額與找零</h3>
                 {paymentMethod === 'Cash' ? (
-                  <div className="space-y-2">
-                    <div onClick={() => setFocusField('cash')} className={`p-3 rounded-xl border-2 cursor-pointer ${focusField === 'cash' ? 'border-blue-500 bg-white ring-4 ring-blue-50' : 'border-slate-100 bg-slate-50'}`}>
-                      <div className="flex justify-between items-center mb-1"><span className="text-slate-400 text-[9px] font-bold uppercase">實收</span>
-                        <div className="flex gap-1">
+                  <div className="space-y-3">
+                    <div onClick={() => setFocusField('cash')} className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${focusField === 'cash' ? 'border-blue-600 bg-white ring-8 ring-blue-50 shadow-lg' : 'border-slate-100 bg-slate-50'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">實收金額</span>
+                        <div className="flex gap-1.5">
                           {[100, 500, 1000].map(v => (
-                            <button key={v} type="button" onClick={(e) => { e.stopPropagation(); setCashReceived(prev => ((parseFloat(prev) || 0) + v).toString()); }} className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-bold hover:border-blue-500">+{v}</button>
+                            <button key={v} type="button" onClick={(e) => { e.stopPropagation(); setCashReceived(prev => ((parseFloat(prev) || 0) + v).toString()); }} className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold hover:border-blue-600 transition-colors shadow-sm">+{v}</button>
                           ))}
                         </div>
                       </div>
-                      <div className="flex items-center justify-between font-black"><span className="text-lg text-slate-300">$</span><span className="text-3xl">{cashReceived || '0'}</span></div>
+                      <div className="flex items-center justify-between font-black"><span className="text-xl text-slate-300">$</span><span className="text-3xl text-slate-800">{cashReceived || '0'}</span></div>
                     </div>
-                    <div className={`p-3 rounded-xl border flex flex-col justify-center shadow-sm ${change >= 0 ? 'bg-green-50 border-green-100 text-green-600' : 'bg-red-50 border-red-100 text-red-500'}`}>
-                      <label className="text-[9px] font-black opacity-60 uppercase mb-0.5">找零金額</label>
-                      <div className="flex items-center justify-between px-1 font-black"><span className="text-lg">$</span><span className="text-2xl">{change >= 0 ? Math.round(change) : "金額不足"}</span></div>
+                    <div className={`p-4 rounded-2xl border flex flex-col justify-center shadow-sm transition-all ${change >= 0 ? 'bg-green-50 border-green-200 text-green-600' : 'bg-red-50 border-red-200 text-red-600'}`}>
+                      <label className="text-[10px] font-black opacity-60 uppercase mb-1 tracking-widest">找零金額</label>
+                      <div className="flex items-center justify-between px-1 font-black"><span className="text-xl">$</span><span className="text-2xl">{change >= 0 ? Math.round(change) : "金額不足"}</span></div>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 p-4 text-center min-h-[140px]">
-                    <CheckCircle2 size={32} className="mb-2 opacity-20 text-blue-500" />
-                    <p className="font-bold text-xs italic">非現金結帳</p>
-                    <p className="text-[9px] mt-1">系統將自動完成全額收款</p>
+                  <div className="h-full bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 p-6 text-center min-h-[160px]">
+                    <CheckCircle2 size={40} className="mb-3 opacity-30 text-blue-500" />
+                    <p className="font-black text-sm italic">數位支付模式</p>
+                    <p className="text-[10px] mt-1 opacity-70">系統將自動記錄全額扣款</p>
                   </div>
                 )}
               </div>
-              <div className="flex flex-col justify-center scale-90 origin-right">
+
+              <div className="flex flex-col pt-6">
+                <div className="h-6 invisible md:visible"> {/* 標題對齊用 */} </div>
                 <Keypad onInput={handleKeypadInput} onClear={() => focusField === 'cash' ? setCashReceived('') : (setDiscount('0'), setDiscountName(''))} onDelete={() => {
                   const s = focusField === 'cash' ? setCashReceived : setDiscount;
                   s(p => p.length > 0 ? p.slice(0, -1) : '0');
@@ -320,10 +328,11 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
               </div>
             </div>
           </div>
-          <div className="flex gap-3 mt-4">
-            <button type="button" onClick={onClose} className="px-6 py-4 rounded-xl font-bold text-slate-400 hover:bg-slate-50 border border-slate-100 transition-colors">取消返回</button>
-            <button type="button" onClick={handleFinalConfirm} disabled={paymentMethod === 'Cash' && change < 0} className={`flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${paymentMethod === 'Cash' && change < 0 ? 'opacity-50 grayscale' : ''}`}>
-              <Wallet size={20} /><span>4. 確認完成結帳</span>
+
+          <div className="flex gap-4 mt-6">
+            <button type="button" onClick={onClose} className="px-8 py-4 rounded-2xl font-bold text-slate-400 hover:bg-slate-50 border border-slate-100 transition-all uppercase tracking-widest text-sm">取消返回</button>
+            <button type="button" onClick={handleFinalConfirm} disabled={paymentMethod === 'Cash' && change < 0} className={`flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xl shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-3 ${paymentMethod === 'Cash' && change < 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:shadow-blue-200'}`}>
+              <Wallet size={24} /><span>4. 確認完成結帳</span>
             </button>
           </div>
         </div>
@@ -945,7 +954,7 @@ export const DatabaseViewPage = () => {
       {viewJson && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50"><h3 className="font-black text-lg">原始 JSON - #{viewJson.orderNo}</h3><button onClick={() => setViewJson(null)} className="p-2 hover:bg-red-100 text-red-500 rounded-xl"><X size={20} /></button></div>
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50"><h3 className="font-black text-lg">原始 JSON - #{viewJson.orderNo}</h3><button onClick={() => setViewJson(null)} className="p-2 hover:bg-red-100 text-red-500 rounded-xl transition-all"><X size={20} /></button></div>
             <div className="flex-1 overflow-auto p-6 bg-slate-900"><pre className="text-green-400 font-mono text-xs whitespace-pre-wrap">{JSON.stringify(viewJson, null, 2)}</pre></div>
           </div>
         </div>
