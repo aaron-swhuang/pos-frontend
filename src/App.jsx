@@ -229,7 +229,7 @@ const Keypad = ({ onInput, onClear, onDelete }) => {
 
 // --- 3. 結帳確認視窗 ---
 export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) => {
-  const { config, discountRules } = useContext(POSContext);
+  const { config, discountRules, shift } = useContext(POSContext);
   const [discount, setDiscount] = useState('0');
   const [discountName, setDiscountName] = useState('');
   const [cashReceived, setCashReceived] = useState('');
@@ -257,7 +257,8 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
     onConfirm({
       total: finalTotal, discount: numDiscount, discountName: discountName || (numDiscount > 0 ? '手動' : ''),
       paymentMethod, cashReceived: paymentMethod === 'Cash' ? numCash : finalTotal,
-      change: paymentMethod === 'Cash' ? Math.max(0, change) : 0
+      change: paymentMethod === 'Cash' ? Math.max(0, change) : 0,
+      businessDate: shift.businessDate
     });
     setDiscount('0'); setDiscountName(''); setCashReceived(''); setPaymentMethod('Cash');
   };
@@ -323,7 +324,6 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
               </div>
             </div>
 
-            {/* 第三區塊：修正重疊且避免溢出 */}
             <div className="grid grid-cols-2 gap-8 items-start">
               <div className="flex flex-col">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-1">3. 收受金額與找零</h3>
@@ -355,7 +355,7 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
               </div>
 
               <div className="flex flex-col pt-6">
-                <div className="h-6 invisible md:visible"> {/* 標題對齊用 */} </div>
+                <div className="h-6 invisible md:visible"> </div>
                 <Keypad onInput={handleKeypadInput} onClear={() => focusField === 'cash' ? setCashReceived('') : (setDiscount('0'), setDiscountName(''))} onDelete={() => {
                   const s = focusField === 'cash' ? setCashReceived : setDiscount;
                   s(p => p.length > 0 ? p.slice(0, -1) : '0');
@@ -365,7 +365,7 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
           </div>
 
           <div className="flex gap-4 mt-6">
-            <button type="button" onClick={onClose} className="px-8 py-4 rounded-2xl font-bold text-slate-400 hover:bg-slate-50 border border-slate-100 transition-all uppercase tracking-widest text-sm">取消返回</button>
+            <button type="button" onClick={onClose} className="px-8 py-4 rounded-2xl font-bold text-slate-400 hover:bg-slate-50 border border-slate-100 uppercase text-sm tracking-widest">取消返回</button>
             <button type="button" onClick={handleFinalConfirm} disabled={paymentMethod === 'Cash' && change < 0} className={`flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xl shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-3 ${paymentMethod === 'Cash' && change < 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:shadow-blue-200'}`}>
               <Wallet size={24} /><span>4. 確認完成結帳</span>
             </button>
@@ -383,12 +383,20 @@ export const VoidReasonModal = ({ isOpen, onClose, onConfirm }) => {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in text-slate-800">
       <div className="bg-white w-full max-w-md rounded-[1.5rem] shadow-2xl p-10">
-        <div className="flex items-center gap-4 mb-6 text-red-500"><div className="bg-red-50 p-3 rounded-2xl"><AlertTriangle size={32} /></div><h3 className="text-2xl font-bold">訂單作廢確認</h3></div>
+        <div className="flex items-center gap-4 mb-6 text-red-500">
+          <div className="bg-red-50 p-3 rounded-2xl"><AlertTriangle size={32} /></div>
+          <h3 className="text-2xl font-bold">訂單作廢確認</h3>
+        </div>
         <div className="grid grid-cols-2 gap-2 mb-4">
-          {['點錯品項', '客人取消', '操作失誤', '食材不足'].map(r => (<button key={r} type="button" onClick={() => setReason(r)} className={`px-4 py-3 rounded-xl text-xs font-bold border transition-all ${reason === r ? 'bg-red-50 border-red-200 text-red-600 shadow-sm' : 'bg-slate-50 text-slate-500'}`}>{r}</button>))}
+          {['點錯品項', '客人取消', '操作失誤', '食材不足'].map(r => (
+            <button key={r} type="button" onClick={() => setReason(r)} className={`px-4 py-3 rounded-xl text-xs font-bold border transition-all ${reason === r ? 'bg-red-50 border-red-200 text-red-600 shadow-sm' : 'bg-slate-50 text-slate-500'}`}>{r}</button>
+          ))}
         </div>
         <textarea className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 outline-none focus:ring-2 focus:ring-red-500 font-medium mb-8 h-28 resize-none text-sm" placeholder="手動輸入原因..." value={reason} onChange={e => setReason(e.target.value)} />
-        <div className="flex gap-4"><button type="button" onClick={onClose} className="flex-1 py-4 rounded-2xl font-bold text-slate-400 hover:bg-slate-50">返回</button><button type="button" disabled={!reason.trim()} onClick={() => onConfirm(reason)} className="flex-[2] py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg">確認作廢</button></div>
+        <div className="flex gap-4">
+          <button type="button" onClick={onClose} className="flex-1 py-4 rounded-2xl font-bold text-slate-400 hover:bg-slate-50">返回</button>
+          <button type="button" disabled={!reason.trim()} onClick={() => onConfirm(reason)} className="flex-[2] py-4 bg-red-600 text-white rounded-2xl font-black shadow-lg">確認作廢</button>
+        </div>
       </div>
     </div>
   );
@@ -400,10 +408,10 @@ export const LoginPage = () => {
   const [auth, setAuth] = useState({ user: '', pass: '' });
   const handleLogin = (e) => {
     e.preventDefault();
-    if (auth.user === 'admin' && auth.pass === '1234') {
+    if (auth.user === 'admin' && auth.pass === 'posadmin') {
       setIsLoggedIn(true);
     } else {
-      showAlert('登入失敗', '帳號或密碼錯誤。預設帳號為 admin，密碼為 1234。', 'danger');
+      showAlert('登入失敗', '帳號或密碼錯誤。預設帳號為 admin，密碼為 posadmin。', 'danger');
     }
   };
   return (
@@ -417,7 +425,7 @@ export const LoginPage = () => {
         </div>
         <form onSubmit={handleLogin} className="p-10 space-y-6">
           <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase">帳號</label><input className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" placeholder="admin" value={auth.user} onChange={e => setAuth({ ...auth, user: e.target.value })} /></div>
-          <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase">密碼</label><input type="password" name="password" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" placeholder="1234" value={auth.pass} onChange={e => setAuth({ ...auth, pass: e.target.value })} /></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase">密碼</label><input type="password" name="password" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" placeholder="posadmin" value={auth.pass} onChange={e => setAuth({ ...auth, pass: e.target.value })} /></div>
           <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-blue-700 active:scale-95 shadow-lg transition-all">進入系統</button>
         </form>
       </div>
@@ -485,7 +493,6 @@ export const POSPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
-  const todayStr = new Date().toLocaleDateString();
   const categories = useMemo(() => ['全部', ...new Set(menu.map(i => i.category).filter(Boolean))], [menu]);
   const filtered = menu.filter(item => (selectedCategory === '全部' || item.category === selectedCategory) && item.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -556,14 +563,13 @@ export const POSPage = () => {
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10 content-start scrollbar-thin">
-          {filtered.map(item => (
-            <button key={item.id} onClick={() => { if (!item.isAvailable) return; setCart(prev => getUpdatedCart(prev, item)) }} className={`p-6 rounded-[2rem] shadow-sm border text-left group h-fit relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-50' : 'bg-slate-50 opacity-60 grayscale'}`}>
-              <div className="font-bold mb-1 truncate">{item.name}</div>
-              <div className="font-black text-xl text-blue-600">${item.price}</div>
-              {!item.isAvailable && <div className="absolute inset-0 bg-slate-900/5 flex items-center justify-center"><span className="bg-slate-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest shadow-sm">暫不供應</span></div>}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10 content-start scrollbar-thin">          {filtered.map(item => (
+          <button key={item.id} onClick={() => { if (!item.isAvailable) return; setCart(prev => getUpdatedCart(prev, item)) }} className={`p-6 rounded-[2rem] shadow-sm border text-left group h-fit relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-500' : 'bg-slate-50 opacity-60 grayscale'}`}>
+            <div className="font-bold mb-1 truncate">{item.name}</div>
+            <div className="font-black text-xl text-blue-600">${item.price}</div>
+            {!item.isAvailable && <div className="absolute inset-0 bg-slate-900/5 flex items-center justify-center"><span className="bg-slate-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest shadow-sm">暫不供應</span></div>}
+          </button>
+        ))}
         </div>
       </div>
       <div className="w-full lg:w-96 flex-shrink-0 bg-white rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-50 h-full overflow-hidden">
@@ -571,8 +577,7 @@ export const POSPage = () => {
           <div className="flex justify-between items-center"><h3 className="font-bold text-xl">購物車</h3><span className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-md shadow-blue-100">{cart.reduce((s, i) => s + i.quantity, 0)} 件</span></div>
           <div className="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-inner font-bold">
             <button onClick={() => setOrderType('dineIn')} className={`flex items-center justify-center py-2.5 rounded-xl text-sm transition-all ${orderType === 'dineIn' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><Utensils size={16} className="mr-2" />內用</button>
-            <button onClick={() => setOrderType('takeOut')} className={`flex items-center justify-center py-2.5 rounded-xl text-sm transition-all ${orderType === 'takeOut' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><ShoppingBag size={16} className="mr-2" />外帶</button>
-          </div>
+            <button onClick={() => setOrderType('takeOut')} className={`flex items-center justify-center py-2.5 rounded-xl text-sm transition-all ${orderType === 'takeOut' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><ShoppingBag size={16} className="mr-2" />外帶</button>          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
           {cart.map(i => (
@@ -871,7 +876,7 @@ export const DashboardPage = () => {
                 {isOrderExpand && (
                   <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in">
                     <div className="space-y-2">{renderItemDetails(order.items)}</div>
-                    <div className="mt-4 pt-4 border-t flex justify-between font-black"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div>
+                    <div className="mt-4 pt-4 border-t flex justify-between font-black text-slate-900"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div>
                   </div>
                 )}
               </div>
@@ -932,14 +937,14 @@ export const DatabaseViewPage = () => {
       <div className="flex justify-between items-center mb-6 shrink-0">
         <div><h2 className="text-2xl font-black flex items-center gap-2"><Database className="text-blue-600" /> 原始數據檢視</h2><p className="text-xs text-slate-400 mt-1">開發者專用：支援分頁與 JSON 導出</p></div>
         <div className="flex gap-2">
-          <div className="relative w-72"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="搜尋、日期、ID或商品名..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm" /></div>
-          <button onClick={() => copyToClipboard(orders)} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg active:scale-95"><Copy size={14} /> 導出全部</button>
+          <div className="relative w-72"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="搜尋、日期、ID或商品名..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm font-medium" /></div>
+          <button onClick={() => copyToClipboard(orders)} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg active:scale-95"><Copy size={14} /> 導出全部 JSON</button>
         </div>
       </div>
 
       <div className="flex-1 overflow-hidden bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col mb-4">
         <div className="overflow-x-auto flex-1 scrollbar-thin">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse font-sans">
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10 shadow-sm">
               <tr>
                 <th className="p-4 w-12 text-center">#</th>
@@ -960,7 +965,7 @@ export const DatabaseViewPage = () => {
                     <td className="p-4 font-bold text-slate-700">#{o.orderNo}</td>
                     <td className="p-4 text-slate-500 font-medium">{o.date} <span className="text-[10px] text-slate-300 ml-1">{o.time}</span></td>
                     <td className="p-4"><span className={`font-bold uppercase text-[9px] ${o.status === 'closed' ? 'text-slate-400' : 'text-green-600'}`}>{o.status}</span></td>
-                    <td className={`p-4 text-right font-black ${o.isVoided ? 'text-slate-300 line-through' : 'text-slate-900'}`}>${o.total}</td>
+                    <td className={`p-4 text-right font-black font-mono ${o.isVoided ? 'text-slate-300 line-through' : 'text-slate-900'}`}>${o.total}</td>
                     <td className="p-4 text-center"><span className={`font-black text-[9px] px-2 py-0.5 rounded ${o.isVoided ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>{o.isVoided ? 'VOID' : (o.paymentMethod || 'PAY')}</span></td>
                     <td className="p-4 text-center">
                       <button onClick={(e) => { e.stopPropagation(); setEditingOrder(o); }} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors"><Edit2 size={14} /></button>
@@ -1053,7 +1058,7 @@ export const DatabaseViewPage = () => {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in font-sans text-slate-900">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50 font-sans"><h3 className="font-black text-xl">原始數據 JSON - #{viewJson.orderNo}</h3><button onClick={() => setViewJson(null)} className="p-2 hover:bg-red-100 text-red-500 rounded-2xl transition-all"><X size={24} /></button></div>
-            <div className="flex-1 overflow-auto p-8 bg-slate-900 font-mono"><pre className="text-green-400 text-xs whitespace-pre-wrap">{JSON.stringify(viewJson, null, 2)}</pre></div>
+            <div className="flex-1 overflow-auto p-8 bg-slate-900 font-mono"><pre className="text-green-400 text-xs whitespace-pre-wrap leading-relaxed">{JSON.stringify(viewJson, null, 2)}</pre></div>
           </div>
         </div>
       )}
@@ -1126,12 +1131,12 @@ export const SettingsPage = () => {
     <div className="max-w-2xl mx-auto w-full font-sans pb-32 animate-in fade-in slide-in-from-bottom-2 px-4 text-slate-900">
       <h2 className="text-2xl font-black mb-8 px-2 tracking-tight uppercase">系統參數設定</h2>
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 space-y-10">
-        <div className="bg-blue-50 p-4 rounded-2xl flex items-center gap-3 text-blue-600 mb-2"><AlertCircle size={20} /><span className="text-sm font-bold">提醒：在此更改的所有設定將立即生效。</span></div>
+        <div className="bg-blue-50 p-4 rounded-2xl flex items-center gap-3 text-blue-600 mb-2 font-bold"><AlertCircle size={20} /><span className="text-sm">提醒：在此更改的所有設定將立即生效。</span></div>
         <section>
-          <div className="flex justify-between items-center mb-4 text-slate-400 px-1">
+          <div className="flex justify-between items-center mb-4 text-slate-400 px-1 font-bold">
             <label className="text-xs font-black uppercase tracking-widest">店舖名稱</label>
             {!isEdit ? (
-              <button onClick={() => { setIsEdit(true); setTemp(config?.storeName || '') }} className="text-blue-600 text-xs font-bold flex items-center gap-1.5 hover:underline"><Edit2 size={12} /> 修改店名</button>
+              <button onClick={() => { setIsEdit(true); setTemp(config?.storeName || '') }} className="text-blue-600 text-xs flex items-center gap-1.5 hover:underline"><Edit2 size={12} /> 修改店名</button>
             ) : (
               <div className="flex gap-5"><button onClick={handleSave} className="text-green-600 text-xs font-black flex items-center gap-1.5 hover:underline active:scale-95"><Save size={14} /> 儲存</button><button onClick={() => setIsEdit(false)} className="text-slate-400 text-xs font-bold hover:underline">取消</button></div>
             )}
@@ -1140,7 +1145,7 @@ export const SettingsPage = () => {
         </section>
         <hr className="border-slate-100" />
         <section>
-          <div className="flex justify-between items-center mb-6 px-1">
+          <div className="flex justify-between items-center mb-6 px-1 font-bold">
             <div><h4 className="font-bold text-lg text-slate-700">內用結帳模式</h4><p className="text-xs text-slate-400 mt-1 font-medium">控制內用點餐是否需要立即付款</p></div>
             <div className="bg-slate-100 p-1.5 rounded-2xl flex shadow-inner border border-slate-200">
               <button onClick={() => setConfig(p => ({ ...p, dineInMode: 'prePay' }))} className={`px-8 py-3 rounded-xl text-sm font-black transition-all ${config?.dineInMode === 'prePay' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>先付款</button>
@@ -1168,6 +1173,7 @@ export const SettingsPage = () => {
   );
 };
 
+// --- 13. 主結構入口 ---
 const MainLayout = () => (
   <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
     <Sidebar />
