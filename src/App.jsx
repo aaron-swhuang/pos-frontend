@@ -454,7 +454,7 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      <div className="flex-1 px-4 space-y-2 mt-6 overflow-y-auto">
+      <div className="flex-1 px-4 space-y-2 overflow-y-auto">
         {navItems.map(item => (
           <Link
             key={item.path}
