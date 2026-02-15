@@ -365,11 +365,16 @@ export const LoginPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
-        <div className="bg-slate-900 p-12 text-center text-white"><div className="inline-flex p-4 bg-blue-600 rounded-2xl mb-4"><User size={32} /></div><h2 className="text-3xl font-bold">POS 系統登入</h2></div>
+        <div className="bg-slate-900 p-12 text-white flex items-center justify-center gap-6">
+          <div className="inline-flex p-4 bg-blue-600 rounded-2xl shadow-lg">
+            <User size={32} />
+          </div>
+          <h2 className="text-3xl font-black tracking-tight">POS 系統登入</h2>
+        </div>
         <form onSubmit={handleLogin} className="p-10 space-y-6">
           <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase">帳號</label><input className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" placeholder="admin" value={auth.user} onChange={e => setAuth({ ...auth, user: e.target.value })} /></div>
           <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase">密碼</label><input type="password" name="password" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium" placeholder="1234" value={auth.pass} onChange={e => setAuth({ ...auth, pass: e.target.value })} /></div>
-          <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-blue-700 active:scale-95 shadow-lg">進入系統</button>
+          <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-blue-700 active:scale-95 shadow-lg transition-all">進入系統</button>
         </form>
       </div>
     </div>
@@ -974,9 +979,17 @@ export const SettingsPage = () => {
         <hr className="border-slate-100" />
         <section className="space-y-6"><h4 className="font-bold text-lg text-slate-700 flex items-center gap-2 px-1"><ShieldCheck size={20} className="text-blue-500" /> 收款管道設定</h4>
           <div className="space-y-3">
-            {[{ id: 'enableCreditCard', label: '信用卡支付系統', icon: CreditCard }, { id: 'enableMobilePayment', label: '行動支付 (Apple/Line)', icon: Smartphone }].map(opt => (
+            {[
+              { id: 'enableCreditCard', label: '信用卡支付系統', desc: '啟用後結帳畫面將出現刷卡選項', icon: CreditCard },
+              { id: 'enableMobilePayment', label: '行動支付 (Apple/Line)', desc: '支援感應支付與條碼掃描付款', icon: Smartphone }
+            ].map(opt => (
               <div key={opt.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-[1.5rem] border border-slate-100/60 shadow-sm transition-all hover:bg-slate-100/40">
-                <div className="flex items-center gap-4 text-slate-400"><div className="p-2.5 bg-white rounded-xl shadow-sm text-blue-500"><opt.icon size={22} /></div><div><p className="text-sm font-black text-slate-800">{opt.label}</p></div></div>
+                <div className="flex items-center gap-4 text-slate-400"><div className="p-2.5 bg-white rounded-xl shadow-sm text-blue-500"><opt.icon size={22} /></div>
+                  <div>
+                    <p className="text-sm font-black text-slate-800">{opt.label}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{opt.desc}</p>
+                  </div>
+                </div>
                 <button type="button" onClick={() => setConfig(p => ({ ...p, [opt.id]: !p[opt.id] }))} className={`w-16 h-8 rounded-full relative transition-all duration-300 ${config[opt.id] ? 'bg-blue-600' : 'bg-slate-300'}`}><div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ${config[opt.id] ? 'left-9' : 'left-1.5'} shadow-sm`}></div></button>
               </div>
             ))}
