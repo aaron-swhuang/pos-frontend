@@ -574,7 +574,7 @@ export const POSPage = () => {
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
           {cart.map(i => (
-            <div key={i.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-100 transition-all">
+            <div key={i.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-100 transition-all flex flex-col">
               <div className="flex justify-between items-start mb-3"><span className="font-bold text-slate-700 text-sm">{i.name}</span><span className="font-black text-slate-900 text-sm">${i.price * i.quantity}</span></div>
               <div className="flex justify-between items-center mt-2">
                 <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl overflow-hidden shadow-inner">
@@ -602,7 +602,7 @@ export const POSPage = () => {
 
 // --- 8. 頁面元件：訂單管理 ---
 export const OrderManagementPage = () => {
-  const { orders, setOrders, shift } = useContext(POSContext);
+  const { orders, setOrders, shift, showAlert } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
   const [activePayOrder, setActivePayOrder] = useState(null);
   const [voidId, setVoidId] = useState(null);
@@ -963,40 +963,6 @@ export const DatabaseViewPage = () => {
                           <div className="space-y-3">
                             <h4 className="text-[10px] font-black text-blue-500 uppercase flex items-center gap-2 mb-2">
                               <Receipt size={12} /> 訂單內容明細
-                            </h4>
-                            <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden shadow-sm">
-                              <table className="w-full text-[11px]">
-                                <thead className="bg-slate-50 border-b border-slate-100">
-                                  <tr>
-                                    <th className="p-2 text-slate-400 font-bold">商品名稱</th>
-                                    <th className="p-2 text-right text-slate-400 font-bold">單價</th>
-                                    <th className="p-2 text-center text-slate-400 font-bold">數量</th>
-                                    <th className="p-2 text-right text-slate-400 font-bold">小計</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                  {o.items?.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-blue-50/10">
-                                      <td className="p-2 font-bold text-slate-600">{item.name}</td>
-                                      <td className="p-2 text-right text-slate-400">${item.price}</td>
-                                      <td className="p-2 text-center font-bold text-slate-500">x{item.quantity}</td>
-                                      <td className="p-2 text-right font-black text-slate-700">${item.price * item.quantity}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                                <tfoot className="bg-blue-50/30 font-black">
-                                  <tr>
-                                    <td colSpan="3" className="p-2 text-right text-blue-600">應收總額</td>
-                                    <td className="p-2 text-right text-blue-600 text-sm">${o.total}</td>
-                                  </tr>
-                                </tfoot>
-                              </table>
-                            </div>
-                          </div>
-                          {/* 右側：元數據摘要 */}
-                          <div className="space-y-4">
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-2">
-                              <ListFilter size={12} /> 系統元數據 (Meta)
                             </h4>
                             <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden shadow-sm">
                               <table className="w-full text-[11px]">
