@@ -3,12 +3,12 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useLocation 
 import {
   LayoutDashboard, ShoppingCart, Settings, LogOut, Plus, Minus, Trash2,
   Store, User, FileText, ChevronDown, ChevronUp, ChevronRight, Utensils, ShoppingBag,
-  Clock, Search, Tag, Edit2, X, CheckCircle2, AlertCircle,
+  Clock, Search, Tag, Edit2, X, CheckCircle, AlertCircle,
   ClipboardList, Wallet, Banknote, CreditCard, Smartphone,
-  Delete, ShieldCheck, RotateCcw, AlertTriangle, Save, Ticket, Eye, EyeOff,
+  ShieldCheck, RotateCcw, AlertTriangle, Save, Ticket, Eye, EyeOff,
   Receipt, Database, Copy, Code, ChevronLeft,
   ChevronsLeft, ChevronsRight, ListFilter, Info, Calendar, FilterX, Play,
-  StopCircle, Lock, Coins, Layers, Check, Component, Grid, Coffee, Bug
+  StopCircle, Lock, Coins, Layers, Check, Box, Bug, CheckCircle2
 } from 'lucide-react';
 
 // --- DEBUG: Error Boundary (捕捉渲染錯誤) ---
@@ -79,9 +79,6 @@ const calculateFinalTotal = (total, discount) => Math.max(0, total - (parseFloat
 
 const calculateChange = (received, total) => (parseFloat(received) || 0) - total;
 
-/**
- * 產生購物車項目的唯一 ID (包含客製化選項)
- */
 const generateCartItemId = (item, selectedModules) => {
   if (!selectedModules || Object.keys(selectedModules).length === 0) {
     return `${item.id}_default`;
@@ -106,27 +103,21 @@ const getUpdatedCart = (prevCart, newItem) => {
 export const POSContext = createContext();
 
 export const POSProvider = ({ children }) => {
-  // 安全讀取 LocalStorage 防止崩潰
   const safeJsonParse = (key, defaultValue) => {
     try {
       const saved = localStorage.getItem(key);
       if (!saved || saved === "undefined" || saved === "null") return defaultValue;
 
       const parsed = JSON.parse(saved);
-
-      // 強制型別檢查
       if (Array.isArray(defaultValue) && !Array.isArray(parsed)) {
-        console.warn(`[POS_DEBUG] Data mismatch for ${key}. Resetting.`);
         return defaultValue;
       }
       return parsed;
     } catch (e) {
-      console.error(`[POS_DEBUG] Error parsing ${key}:`, e);
       return defaultValue;
     }
   };
 
-  // 1. 全域客製化模組庫
   const [modifierTemplates, setModifierTemplates] = useState(() => safeJsonParse('pos_templates', [
     { id: 't1', name: '尺寸 (Size)', options: ['大杯', '中杯'] },
     { id: 't2', name: '冰塊 (Ice)', options: ['正常冰', '少冰', '微冰', '去冰', '溫', '熱'] },
@@ -134,7 +125,6 @@ export const POSProvider = ({ children }) => {
     { id: 't4', name: '加料 (Toppings)', options: ['珍珠', '椰果'] }
   ]));
 
-  // 2. 菜單資料
   const [menu, setMenu] = useState(() => safeJsonParse('pos_menu', [
     { id: 1, name: '招牌美式', price: 65, category: '咖啡', isAvailable: true },
     { id: 2, name: '經典拿鐵', price: 85, category: '咖啡', isAvailable: true },
@@ -224,7 +214,7 @@ const GlobalModal = () => {
     switch (modal.type) {
       case 'danger': return <AlertTriangle className="text-red-500" size={32} />;
       case 'success': return <CheckCircle2 className="text-green-500" size={32} />;
-      case 'confirm': return <HelpCircle className="text-blue-500" size={32} />;
+      case 'confirm': return <Info className="text-blue-500" size={32} />;
       default: return <Info className="text-blue-500" size={32} />;
     }
   };
@@ -246,8 +236,6 @@ const GlobalModal = () => {
   );
 };
 
-const HelpCircle = ({ size, className }) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>);
-
 // --- 2. 組件：數字算盤 ---
 const Keypad = ({ onInput, onClear, onDelete }) => {
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '00', '.'];
@@ -255,7 +243,7 @@ const Keypad = ({ onInput, onClear, onDelete }) => {
     <div className="grid grid-cols-3 gap-2">
       {keys.map(key => (<button key={key} type="button" onClick={() => onInput(key)} className="h-12 rounded-xl bg-white border border-slate-200 shadow-sm text-xl font-bold text-slate-800 hover:bg-blue-50 active:scale-95 transition-all">{key}</button>))}
       <button type="button" onClick={onClear} className="h-12 rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100 text-sm uppercase">AC</button>
-      <button type="button" onClick={onDelete} className="h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200"><Delete size={20} /></button>
+      <button type="button" onClick={onDelete} className="h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200"><ChevronLeft size={24} /></button>
     </div>
   );
 };
@@ -270,10 +258,8 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
         setSelectedModules(initialData.selectedModules || {});
       } else {
         const defaults = {};
-        // Compatibility: 確保 modules 是陣列
         const modules = product.modules || [];
         modules.forEach(mod => {
-          // Variant (定價策略) 預設選第一個，因為是必選
           if (mod.type === 'variant' && mod.options && mod.options.length > 0) {
             defaults[mod.name] = mod.options[0];
           }
@@ -287,12 +273,10 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
 
   const safeModules = product.modules || [];
 
-  // 計算當前價格
   const calculateCurrentPrice = () => {
     let finalPrice = 0;
     let hasVariantSet = false;
 
-    // 1. Variant Logic (定價模式)
     safeModules.forEach(mod => {
       const selectedOpt = selectedModules[mod.name];
       if (mod.type === 'variant' && selectedOpt) {
@@ -301,16 +285,13 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
       }
     });
 
-    // 若無設定定價模組，使用商品原價
     if (!hasVariantSet) { finalPrice = product.price || 0; }
 
-    // 2. Addon Logic (加價模式)
     safeModules.forEach(mod => {
       const selectedOpt = selectedModules[mod.name];
       if (mod.type === 'addon' && selectedOpt) {
         finalPrice += (selectedOpt.price || 0);
       }
-      // type 'option' 不影響價格
     });
     return finalPrice;
   };
@@ -326,7 +307,6 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
 
   const handleSelectOption = (moduleName, option, type) => {
     setSelectedModules(prev => {
-      // Addon 和 Option 可取消 (Toggle)
       if ((type === 'addon' || type === 'option') && prev[moduleName]?.name === option.name) {
         const next = { ...prev };
         delete next[moduleName];
@@ -354,7 +334,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
                 {mod.type === 'addon' && <Plus size={14} className="text-blue-500" />}
                 {mod.type === 'option' && <CheckCircle2 size={14} className="text-green-500" />}
                 <h4 className={`text-xs font-black uppercase tracking-widest ${mod.type === 'variant' ? 'text-orange-600' :
-                    mod.type === 'addon' ? 'text-blue-600' : 'text-green-600'
+                  mod.type === 'addon' ? 'text-blue-600' : 'text-green-600'
                   }`}>
                   {mod.name}
                   {mod.type === 'variant' ? '(定價)' : mod.type === 'addon' ? '(加選)' : '(選項)'}
@@ -369,8 +349,8 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
                       key={optIdx}
                       onClick={() => handleSelectOption(mod.name, opt, mod.type)}
                       className={`px-4 py-3 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center min-w-[80px] ${isSelected
-                          ? (mod.type === 'variant' ? 'border-orange-500 bg-orange-50 text-orange-700' : mod.type === 'addon' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-green-500 bg-green-50 text-green-700')
-                          : 'border-slate-100 hover:border-slate-300 text-slate-600 bg-white'
+                        ? (mod.type === 'variant' ? 'border-orange-500 bg-orange-50 text-orange-700' : mod.type === 'addon' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-green-500 bg-green-50 text-green-700')
+                        : 'border-slate-100 hover:border-slate-300 text-slate-600 bg-white'
                         }`}
                     >
                       <span>{opt.name}</span>
@@ -717,12 +697,15 @@ export const POSPage = () => {
     <div className="flex flex-col lg:flex-row gap-8 h-full overflow-hidden text-slate-900 font-sans">
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex justify-between items-center mb-6 shrink-0"><div className="flex items-center gap-4"><h2 className="text-2xl font-bold">點餐收銀</h2><div className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest">營業日: {shift.businessDate}</div></div><div className="relative w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="搜尋商品名稱..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-medium" /></div></div><div className="flex gap-2 mb-6 overflow-x-auto pb-2 shrink-0 no-scrollbar">{categories.map(c => (<button key={c} onClick={() => setSelectedCategory(c)} className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm border transition-all ${selectedCategory === c ? 'bg-blue-600 text-white shadow-md border-blue-600' : 'bg-white text-slate-500 border-slate-100 hover:border-blue-200'}`}>{c}</button>))}</div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-y-auto pr-2 flex-1 pb-10 content-start scrollbar-thin">
+        {/* UI Fix: gap-3, p-4, rounded-2xl, 移除標籤 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2 flex-1 pb-10 content-start scrollbar-thin">
           {filtered.map(item => (
-            <button key={item.id} onClick={() => { if (!item.isAvailable) return; handleAddToCart(item); }} className={`p-6 rounded-[2rem] shadow-sm border text-left group h-fit relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-50' : 'bg-slate-50 opacity-60 grayscale'}`}>
-              <div className="font-bold mb-1 truncate text-slate-800">{item.name}</div>
-              <div className="font-black text-xl text-blue-600">${item.price}</div>
-              {(item.modules && item.modules.length > 0) && <div className="mt-2 inline-flex items-center gap-1 bg-slate-100 text-slate-500 text-[10px] px-2 py-1 rounded font-bold"><Layers size={10} /> 可客製</div>}
+            <button key={item.id} onClick={() => { if (!item.isAvailable) return; handleAddToCart(item); }} className={`p-4 rounded-2xl shadow-sm border text-left group h-full min-h-[120px] flex flex-col justify-between relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-50' : 'bg-slate-50 opacity-60 grayscale'}`}>
+              <div>
+                <div className="font-bold mb-2 truncate text-slate-800 text-base">{item.name}</div>
+                <div className="font-black text-2xl text-blue-600 font-mono">${item.price}</div>
+              </div>
+              {/* 移除客製化標籤 */}
               {!item.isAvailable && <div className="absolute inset-0 bg-slate-900/5 flex items-center justify-center"><span className="bg-slate-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest shadow-sm">暫不供應</span></div>}
             </button>
           ))}
@@ -740,7 +723,6 @@ export const POSPage = () => {
               <div className="flex justify-between items-start mb-1">
                 <div>
                   <span className="font-bold text-slate-700 text-sm block">{i.name}</span>
-                  {/* 顯示客製化詳情 */}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {Object.entries(i.selectedModules || {}).map(([key, val], idx) => (
                       <span key={idx} className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${val.price > 0 ? 'text-blue-600 bg-blue-50' : 'text-slate-500 bg-slate-100'}`}>
@@ -816,7 +798,7 @@ export const AdminPage = () => {
     const newItem = {
       ...item,
       price: parseFloat(item.price) || 0,
-      modules: item.modules // 儲存模組設定
+      modules: item.modules
     };
     if (editId) {
       setMenu(menu.map(i => i.id === editId ? { ...i, ...newItem } : i));
@@ -870,7 +852,7 @@ export const AdminPage = () => {
     const newModule = {
       id: Date.now().toString(),
       templateId: template.id,
-      name: template.name.split(' ')[0], // 簡化名稱
+      name: template.name.split(' ')[0],
       type: 'addon',
       options: template.options.map(opt => ({ name: opt, price: 0 }))
     };
@@ -1185,7 +1167,8 @@ export const SettlementPage = () => {
       }
       return updated;
     });
-    // 不關閉訂單，不關閉班次
+    // 關鍵修正：將這些訂單標記為 'closed' (已結算)，讓 UI 標籤變色
+    setOrders(prev => prev.map(o => (o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided)) ? { ...o, status: 'closed' } : o));
     showAlert('成功', '已更新當日報表預覽，班次仍保持開啟。', 'success');
   };
 
@@ -1235,7 +1218,12 @@ export const SettlementPage = () => {
                 <div onClick={() => setExpandOrderId(isOrderExpand ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
                   <div className="flex-1">
                     <div className="font-bold flex items-center text-slate-700">#{order.orderNo || 'N/A'} - {order.date} <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}</span>
-                      <span className={`ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase ${order.status === 'closed' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-600'}`}>{order.status === 'closed' ? '已結算' : '未結算'}</span>
+                      {/* 修正：加入結算狀態標籤 */}
+                      {order.status === 'closed' ? (
+                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-gray-200 text-gray-500">已結算</span>
+                      ) : (
+                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-green-100 text-green-600 animate-pulse">未結算</span>
+                      )}
                     </div>
                     <div className="text-xs font-mono italic text-slate-400">ID: {order.id} {order.isVoided && `| 原因: ${order.voidReason}`}</div>
                   </div>
