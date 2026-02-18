@@ -612,7 +612,7 @@ export const LoginPage = () => {
     if (auth.user === 'admin' && auth.pass === 'posadmin') {
       setIsLoggedIn(true);
     } else {
-      showAlert('登入失敗', '帳號密碼錯誤', 'danger');
+      showAlert('登入失敗', '帳號或密碼錯誤。預設帳號為 admin，密碼為 posadmin。', 'danger');
     }
   };
 
@@ -740,7 +740,6 @@ export const POSPage = () => {
     <div className="flex flex-col lg:flex-row gap-8 h-full overflow-hidden text-slate-900 font-sans">
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex justify-between items-center mb-6 shrink-0"><div className="flex items-center gap-4"><h2 className="text-2xl font-bold">點餐收銀</h2><div className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest">營業日: {shift.businessDate}</div></div><div className="relative w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="搜尋商品名稱..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none shadow-sm font-medium" /></div></div><div className="flex gap-2 mb-6 overflow-x-auto pb-2 shrink-0 no-scrollbar">{categories.map(c => (<button key={c} onClick={() => setSelectedCategory(c)} className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm border transition-all ${selectedCategory === c ? 'bg-blue-600 text-white shadow-md border-blue-600' : 'bg-white text-slate-500 border-slate-100 hover:border-blue-200'}`}>{c}</button>))}</div>
-
         {/* UI Fix: gap-3, p-4, rounded-2xl, 移除標籤 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2 flex-1 pb-10 content-start scrollbar-thin">
           {filtered.map(item => (
@@ -755,7 +754,6 @@ export const POSPage = () => {
           ))}
         </div>
       </div>
-
       <div className="w-full lg:w-96 flex-shrink-0 bg-white rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-50 h-full overflow-hidden">
         <div className="p-8 border-b flex flex-col gap-4 bg-slate-50/50">
           <div className="flex justify-between items-center"><h3 className="font-bold text-xl text-slate-800">購物車</h3><span className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-md">{cart.reduce((s, i) => s + i.quantity, 0)} 件</span></div>
@@ -779,11 +777,7 @@ export const POSPage = () => {
                 <span className="font-black text-slate-900 text-sm font-mono tracking-tight">${i.price * i.quantity}</span>
               </div>
               <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-50">
-                <div onClick={(e) => e.stopPropagation()} className="flex items-center bg-slate-50 border border-slate-100 rounded-xl overflow-hidden shadow-inner">
-                  <button onClick={() => { const nQty = Math.max(0, i.quantity - 1); if (nQty > 0) setCart(cart.map(it => it.cartId === i.cartId ? { ...it, quantity: nQty } : it)); else setCart(cart.filter(it => it.cartId !== i.cartId)); }} className="p-2 hover:bg-slate-200 transition-colors text-slate-500"><Minus size={14} /></button>
-                  <span className="w-8 text-center font-bold text-sm text-slate-700">{i.quantity}</span>
-                  <button onClick={() => setCart(cart.map(it => it.cartId === i.cartId ? { ...it, quantity: it.quantity + 1 } : it))} className="p-2 hover:bg-slate-200 transition-colors text-slate-500"><Plus size={14} /></button>
-                </div>
+                <div onClick={(e) => e.stopPropagation()} className="flex items-center bg-slate-50 border border-slate-100 rounded-xl overflow-hidden shadow-inner"><button onClick={() => { const nQty = Math.max(0, i.quantity - 1); if (nQty > 0) setCart(cart.map(it => it.cartId === i.cartId ? { ...it, quantity: nQty } : it)); else setCart(cart.filter(it => it.cartId !== i.cartId)); }} className="p-2 hover:bg-slate-200 transition-colors text-slate-500"><Minus size={14} /></button><span className="w-8 text-center font-bold text-sm text-slate-700">{i.quantity}</span><button onClick={() => setCart(cart.map(it => it.cartId === i.cartId ? { ...it, quantity: it.quantity + 1 } : it))} className="p-2 hover:bg-slate-200 transition-colors text-slate-500"><Plus size={14} /></button></div>
                 <button onClick={(e) => { e.stopPropagation(); setCart(cart.filter(it => it.cartId !== i.cartId)); }} className="text-red-300 hover:text-red-500 p-2 transition-colors"><Trash2 size={18} /></button>
               </div>
               <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={14} className="text-blue-400" /></div>
@@ -800,7 +794,7 @@ export const POSPage = () => {
   );
 };
 
-// --- 8. OrderManagementPage ---
+// --- 8. OrderManagementPage (補回遺漏的頁面，修正展開顯示) ---
 export const OrderManagementPage = () => {
   const { orders, setOrders, shift, showAlert } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
@@ -809,7 +803,7 @@ export const OrderManagementPage = () => {
   const pending = orders.filter(o => o.status === 'unclosed' && o.paymentStatus === 'pending' && !o.isVoided);
   const history = orders.filter(o => o.status === 'unclosed' && (o.paymentStatus === 'paid' || o.isVoided));
   const handleActionClick = (actionFn) => { if (!shift.isOpen) { showAlert('操作鎖定', '目前班次已結清休息中，無法修改。', 'danger'); return; } actionFn(); };
-  return (<div className="max-w-6xl h-full flex flex-col overflow-hidden text-slate-900 font-sans"><div className="flex justify-between items-end mb-8 shrink-0"><div><h2 className="text-3xl font-black text-slate-800 uppercase">訂單管理</h2><p className="text-slate-400 mt-1 flex items-center gap-2 font-medium">目前未日結交易清單 {!shift.isOpen && <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-black">班次鎖定</span>}</p></div><div className="flex gap-4 font-bold"><div className="bg-amber-50 px-8 py-4 rounded-3xl text-right border border-amber-100 text-amber-700 shadow-sm"><p className="text-[10px] uppercase font-black text-amber-500">待收</p><p className="text-2xl font-black font-mono">${pending.reduce((s, o) => s + o.total, 0)}</p></div><div className="bg-blue-50 px-8 py-4 rounded-3xl text-right border border-blue-100 text-blue-700 shadow-sm"><p className="text-[10px] uppercase font-black text-blue-500">實收</p><p className="text-2xl font-black font-mono">${history.filter(o => !o.isVoided).reduce((s, o) => s + o.total, 0)}</p></div></div></div><div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-10 overflow-hidden"><div className="flex flex-col min-h-0"><h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2 tracking-widest"><AlertCircle size={16} className="text-amber-500" /> 待收款區 ({pending.length})</h3><div className="flex-1 overflow-y-auto space-y-4 pb-10 pr-2 scrollbar-thin">{pending.map(o => (
+  return (<div className="max-w-6xl h-full flex flex-col overflow-hidden text-slate-900 font-sans"><div className="flex justify-between items-end mb-8 shrink-0"><div><h2 className="text-3xl font-black text-slate-800 uppercase tracking-tight">訂單管理</h2><p className="text-slate-400 mt-1 flex items-center gap-2 font-medium">目前未日結交易清單 {!shift.isOpen && <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-black">班次鎖定</span>}</p></div><div className="flex gap-4 font-bold"><div className="bg-amber-50 px-8 py-4 rounded-3xl text-right border border-amber-100 text-amber-700 shadow-sm"><p className="text-[10px] uppercase font-black text-amber-500">待收</p><p className="text-2xl font-black font-mono">${pending.reduce((s, o) => s + o.total, 0)}</p></div><div className="bg-blue-50 px-8 py-4 rounded-3xl text-right border border-blue-100 text-blue-700 shadow-sm"><p className="text-[10px] uppercase font-black text-blue-500">實收</p><p className="text-2xl font-black font-mono">${history.filter(o => !o.isVoided).reduce((s, o) => s + o.total, 0)}</p></div></div></div><div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-10 overflow-hidden"><div className="flex flex-col min-h-0"><h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2 tracking-widest"><AlertCircle size={16} className="text-amber-500" /> 待收款區 ({pending.length})</h3><div className="flex-1 overflow-y-auto space-y-4 pb-10 pr-2 scrollbar-thin">{pending.map(o => (
     <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-6 rounded-[2rem] border transition-all cursor-pointer ${expandedId === o.id ? 'ring-2 ring-blue-500 shadow-xl' : 'border-slate-100 hover:border-blue-200'}`}><div className="flex justify-between items-center"><div><div className="flex items-center gap-2 mb-1.5 font-black text-xl text-slate-800">#{o.orderNo} <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-black">待付款</span></div><div className="text-xs text-slate-400 flex items-center gap-1 font-mono tracking-tight"><Clock size={12} />{o.date} {o.time}</div></div><div className="flex items-center gap-4"><button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={20} /></button><div className="text-right mx-2 font-sans"><p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">金額</p><p className="text-2xl font-black text-slate-800 font-mono">${o.total}</p></div><button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setActivePayOrder(o)); }} className={`bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-lg hover:bg-blue-600 transition-all text-sm uppercase ${!shift.isOpen ? 'opacity-30' : ''}`}>前往付款 PAY</button></div></div>{expandedId === o.id && <div className="mt-6 pt-5 border-t border-slate-100 space-y-2">{(o.items || []).map((it, idx) => (<div key={idx} className="flex justify-between text-sm text-slate-600 font-medium font-sans">
       <div className="flex flex-col">
         <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
@@ -844,7 +838,7 @@ export const AdminPage = () => {
   // 新增：編輯優惠狀態
   const [editingDiscountId, setEditingDiscountId] = useState(null);
 
-  // 控制模組選擇器顯示 (Fix: 使用 State 控制顯示)
+  // 控制模組選擇器顯示
   const [showModuleSelector, setShowModuleSelector] = useState(false);
 
   const loadEditItem = (i) => {
@@ -1526,6 +1520,7 @@ export const DatabaseViewPage = () => {
                             </table>
                           </div>
                         </div>
+                        {/* 右側：元數據摘要 */}
                         <div className="space-y-4">
                           <h4 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-2"><ListFilter size={12} /> 系統元數據 (Meta)</h4>
                           <div className="grid grid-cols-2 gap-3 text-[10px]">
@@ -1552,7 +1547,51 @@ export const DatabaseViewPage = () => {
         </div>
       </div>
       {viewJson && (<div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"><div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden"><div className="p-8 border-b flex justify-between items-center bg-slate-50"><h3 className="font-black text-xl">JSON</h3><button onClick={() => setViewJson(null)}><X size={24} /></button></div><div className="flex-1 overflow-auto p-8 bg-slate-900 font-mono"><pre className="text-green-400 text-xs">{JSON.stringify(viewJson, null, 2)}</pre></div></div></div>)}
-      {editingOrder && (<div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"><div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl"><h3 className="font-black text-xl mb-4">編輯訂單</h3>{/* 簡化編輯表單 */}<div className="flex gap-4 mt-6"><button onClick={() => setEditingOrder(null)} className="flex-1 py-2 bg-slate-100 rounded-xl font-bold">取消</button><button onClick={() => handleUpdateOrder(editingOrder)} className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold">儲存</button></div></div></div>)}
+      {editingOrder && (<div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"><div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl"><h3 className="font-black text-xl mb-4">編輯訂單 #{editingOrder.orderNo}</h3>
+        {/* 修正：恢復完整的編輯表單 */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500">狀態 (Status)</label>
+            <select
+              className="w-full border rounded-lg p-2 mt-1"
+              value={editingOrder.status}
+              onChange={e => setEditingOrder({ ...editingOrder, status: e.target.value })}
+            >
+              <option value="unclosed">Unclosed</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500">付款狀態 (Payment)</label>
+            <select
+              className="w-full border rounded-lg p-2 mt-1"
+              value={editingOrder.paymentStatus}
+              onChange={e => setEditingOrder({ ...editingOrder, paymentStatus: e.target.value })}
+            >
+              <option value="pending">Pending</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500">日期 (YYYY-MM-DD) <span className="text-red-500">*</span></label>
+            <input
+              className="w-full border rounded-lg p-2 mt-1 font-mono"
+              value={editingOrder.date}
+              onChange={e => setEditingOrder({ ...editingOrder, date: e.target.value })}
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              id="voidCheck"
+              checked={editingOrder.isVoided}
+              onChange={e => setEditingOrder({ ...editingOrder, isVoided: e.target.checked })}
+              className="w-4 h-4 accent-red-600"
+            />
+            <label htmlFor="voidCheck" className="text-sm font-bold text-slate-700">標記為已作廢 (Voided)</label>
+          </div>
+        </div>
+        <div className="flex gap-4 mt-6"><button onClick={() => setEditingOrder(null)} className="flex-1 py-2 bg-slate-100 rounded-xl font-bold">取消</button><button onClick={() => handleUpdateOrder(editingOrder)} className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold">儲存</button></div></div></div>)}
     </div>
   );
 };
