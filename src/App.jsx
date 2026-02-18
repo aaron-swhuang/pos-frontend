@@ -11,7 +11,29 @@ import {
   StopCircle, Lock, Coins, Layers, Check, Box, Bug, CheckCircle2
 } from 'lucide-react';
 
-// --- DEBUG: Error Boundary (捕捉渲染錯誤) ---
+// --- Helpers: 統一日期與時間格式 ---
+const getTodayDate = () => {
+  const date = new Date();
+  // 取得當地時間的 YYYY-MM-DD
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getCurrentTime = () => {
+  const date = new Date();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+};
+
+const getCurrentDateTime = () => {
+  return `${getTodayDate()} ${getCurrentTime()}`;
+};
+
+// --- DEBUG: Error Boundary ---
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -23,7 +45,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("[POS_CRASH] Error caught by boundary:", error, errorInfo);
+    console.error("[POS_CRASH]", error, errorInfo);
     this.setState({ errorInfo });
   }
 
@@ -173,8 +195,8 @@ export const POSProvider = ({ children }) => {
   };
 
   const openShift = () => {
-    const today = new Date().toLocaleDateString();
-    const newShift = { isOpen: true, businessDate: today, openedAt: new Date().toLocaleString() };
+    const today = getTodayDate();
+    const newShift = { isOpen: true, businessDate: today, openedAt: getCurrentDateTime() };
     setShift(newShift);
     try { localStorage.setItem('pos_shift', JSON.stringify(newShift)); } catch (e) { }
     showAlert('開帳成功', `營業日已設定為 ${today}。`, 'success');
@@ -248,7 +270,7 @@ const Keypad = ({ onInput, onClear, onDelete }) => {
   );
 };
 
-// --- 2.5 新增組件：商品選項視窗 ---
+// --- 2.5 組件：商品選項視窗 ---
 const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }) => {
   const [selectedModules, setSelectedModules] = useState({});
 
@@ -258,12 +280,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
         setSelectedModules(initialData.selectedModules || {});
       } else {
         const defaults = {};
-        const modules = product.modules || [];
-        modules.forEach(mod => {
-          if (mod.type === 'variant' && mod.options && mod.options.length > 0) {
-            defaults[mod.name] = mod.options[0];
-          }
-        });
+        // 修正：不強制預設選取 Variant
         setSelectedModules(defaults);
       }
     }
@@ -280,7 +297,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
     safeModules.forEach(mod => {
       const selectedOpt = selectedModules[mod.name];
       if (mod.type === 'variant' && selectedOpt) {
-        finalPrice = selectedOpt.price || 0;
+        finalPrice = parseFloat(selectedOpt.price || 0);
         hasVariantSet = true;
       }
     });
@@ -290,7 +307,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
     safeModules.forEach(mod => {
       const selectedOpt = selectedModules[mod.name];
       if (mod.type === 'addon' && selectedOpt) {
-        finalPrice += (selectedOpt.price || 0);
+        finalPrice += parseFloat(selectedOpt.price || 0);
       }
     });
     return finalPrice;
@@ -307,7 +324,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
 
   const handleSelectOption = (moduleName, option, type) => {
     setSelectedModules(prev => {
-      if ((type === 'addon' || type === 'option') && prev[moduleName]?.name === option.name) {
+      if (prev[moduleName]?.name === option.name) {
         const next = { ...prev };
         delete next[moduleName];
         return next;
@@ -429,11 +446,10 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
                 <div key={idx} className="flex justify-between text-sm text-slate-600 border-b border-slate-100 py-3 last:border-0">
                   <div className="flex flex-col max-w-[70%]">
                     <span className="font-bold text-slate-800 truncate">{item.name}</span>
-                    {/* 顯示客製化內容 */}
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {Object.entries(item.selectedModules || {}).map(([key, val], i) => val ? (
+                      {Object.values(item.selectedModules || {}).map((val, i) => val ? (
                         <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
-                          {key}: {val.name}
+                          {val.name}
                         </span>
                       ) : null)}
                     </div>
@@ -518,8 +534,8 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
             </div>
           </div>
           <div className="flex gap-4 mt-6">
-            <button type="button" onClick={onClose} className="px-8 py-4 rounded-2xl font-bold text-slate-400 hover:bg-slate-50 border border-slate-100 uppercase text-sm tracking-widest">取消返回</button>
-            <button type="button" onClick={handleFinalConfirm} disabled={paymentMethod === 'Cash' && change < 0} className={`flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xl shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-3 ${paymentMethod === 'Cash' && change < 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:shadow-blue-200'}`}>
+            <button onClick={onClose} className="px-8 py-4 rounded-2xl font-bold text-slate-400 hover:bg-slate-50 border border-slate-100 uppercase text-sm tracking-widest">取消返回</button>
+            <button onClick={handleFinalConfirm} disabled={paymentMethod === 'Cash' && change < 0} className={`flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xl shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-3 ${paymentMethod === 'Cash' && change < 0 ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:shadow-blue-200'}`}>
               <Wallet size={24} /><span>4. 確認完成結帳</span>
             </button>
           </div>
@@ -569,7 +585,6 @@ export const LoginPage = () => {
     }
   };
 
-  // 緊急重置按鈕 (解決白屏問題的最後手段)
   const handleReset = () => {
     if (window.confirm('確定要清除所有資料並重置系統嗎？')) {
       localStorage.clear();
@@ -623,7 +638,7 @@ export const Sidebar = () => {
   );
 };
 
-// --- 7. 前台收銀頁面 (整合客製化) ---
+// --- 7. 前台收銀頁面 (修正 UI: 移除標籤，間距 gap-3，更緊湊) ---
 export const POSPage = () => {
   const { menu, setOrders, orders, config, shift, openShift, showConfirm } = useContext(POSContext);
   const [cart, setCart] = useState([]);
@@ -637,13 +652,10 @@ export const POSPage = () => {
   const filtered = menu.filter(item => (selectedCategory === '全部' || item.category === selectedCategory) && item.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleAddToCart = (item) => {
-    // 檢查是否有客製化模組 (兼容舊資料)
     const hasModules = item.modules && item.modules.length > 0;
-
     if (hasModules) {
       setOptionModal({ isOpen: true, product: item, initialData: null });
     } else {
-      // 直接加入購物車
       const newItem = {
         ...item,
         selectedModules: {},
@@ -661,7 +673,6 @@ export const POSPage = () => {
     };
 
     setCart(prev => {
-      // 如果是編輯模式，先移除舊的
       let currentCart = prev;
       if (optionModal.initialData) {
         const oldId = generateCartItemId(optionModal.initialData, optionModal.initialData.selectedModules);
@@ -684,7 +695,8 @@ export const POSPage = () => {
       const orderDate = shift.businessDate;
       const c = orders.filter(o => o.date === orderDate && o.orderType === orderType).length;
       const orderNo = pref + (c + 1).toString().padStart(3, '0');
-      const newO = { id: Date.now(), orderNo, total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0), items: [...cart], orderType, date: orderDate, time: new Date().toLocaleTimeString(), status: 'unclosed', isVoided: false, paymentStatus: (orderType === 'dineIn' && config?.dineInMode === 'postPay' && !data.paymentMethod) ? 'pending' : 'paid', ...data };
+      // Fix: 使用 getCurrentTime 統一時間格式 (HH:mm:ss)
+      const newO = { id: Date.now(), orderNo, total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0), items: [...cart], orderType, date: orderDate, time: getCurrentTime(), status: 'unclosed', isVoided: false, paymentStatus: (orderType === 'dineIn' && config?.dineInMode === 'postPay' && !data.paymentMethod) ? 'pending' : 'paid', ...data };
       setOrders(prev => [...prev, newO]); setCart([]); setIsCheckoutModalOpen(false);
     };
     if (orderType === 'dineIn' && config?.dineInMode === 'postPay' && !data.paymentMethod) showConfirm('送出點餐', '確定要送出此筆點餐清單並記錄為「待付款」嗎？', handleFinalize);
@@ -697,13 +709,14 @@ export const POSPage = () => {
     <div className="flex flex-col lg:flex-row gap-8 h-full overflow-hidden text-slate-900 font-sans">
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex justify-between items-center mb-6 shrink-0"><div className="flex items-center gap-4"><h2 className="text-2xl font-bold">點餐收銀</h2><div className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest">營業日: {shift.businessDate}</div></div><div className="relative w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="搜尋商品名稱..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-medium" /></div></div><div className="flex gap-2 mb-6 overflow-x-auto pb-2 shrink-0 no-scrollbar">{categories.map(c => (<button key={c} onClick={() => setSelectedCategory(c)} className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm border transition-all ${selectedCategory === c ? 'bg-blue-600 text-white shadow-md border-blue-600' : 'bg-white text-slate-500 border-slate-100 hover:border-blue-200'}`}>{c}</button>))}</div>
+
         {/* UI Fix: gap-3, p-4, rounded-2xl, 移除標籤 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2 flex-1 pb-10 content-start scrollbar-thin">
           {filtered.map(item => (
             <button key={item.id} onClick={() => { if (!item.isAvailable) return; handleAddToCart(item); }} className={`p-4 rounded-2xl shadow-sm border text-left group h-full min-h-[120px] flex flex-col justify-between relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-50' : 'bg-slate-50 opacity-60 grayscale'}`}>
               <div>
-                <div className="font-bold mb-2 truncate text-slate-800 text-base">{item.name}</div>
-                <div className="font-black text-2xl text-blue-600 font-mono">${item.price}</div>
+                <div className="font-bold mb-1 truncate text-slate-800 text-base">{item.name}</div>
+                <div className="font-black text-xl text-blue-600 font-mono">${item.price}</div>
               </div>
               {/* 移除客製化標籤 */}
               {!item.isAvailable && <div className="absolute inset-0 bg-slate-900/5 flex items-center justify-center"><span className="bg-slate-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest shadow-sm">暫不供應</span></div>}
@@ -723,10 +736,11 @@ export const POSPage = () => {
               <div className="flex justify-between items-start mb-1">
                 <div>
                   <span className="font-bold text-slate-700 text-sm block">{i.name}</span>
+                  {/* 顯示客製化詳情: 只顯示選項名稱 */}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {Object.entries(i.selectedModules || {}).map(([key, val], idx) => (
                       <span key={idx} className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${val.price > 0 ? 'text-blue-600 bg-blue-50' : 'text-slate-500 bg-slate-100'}`}>
-                        {key}: {val.name}
+                        {val.name}
                       </span>
                     ))}
                   </div>
@@ -755,7 +769,7 @@ export const POSPage = () => {
   );
 };
 
-// --- 8. 頁面元件：訂單管理 ---
+// --- 8. 頁面元件：訂單管理 (補回遺漏的頁面) ---
 export const OrderManagementPage = () => {
   const { orders, setOrders, shift, showAlert } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
@@ -876,9 +890,10 @@ export const AdminPage = () => {
     setItem(prev => ({ ...prev, modules: newModules }));
   };
 
-  const updateModuleOptionPrice = (moduleIdx, optionIdx, price) => {
+  // Fix: 允許直接輸入字串，避免無法輸入小數點或清空
+  const updateModuleOptionPrice = (moduleIdx, optionIdx, val) => {
     const newModules = [...item.modules];
-    newModules[moduleIdx].options[optionIdx].price = parseFloat(price) || 0;
+    newModules[moduleIdx].options[optionIdx].price = val; // Store as string temporarily
     setItem(prev => ({ ...prev, modules: newModules }));
   };
 
@@ -969,7 +984,7 @@ export const AdminPage = () => {
                             <>
                               <span className="text-xs text-slate-400 font-bold">{mod.type === 'variant' ? '單價' : '加價'} $</span>
                               <input
-                                type="number"
+                                type="text" // Fix: 使用 text 允許小數點輸入
                                 className="w-16 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-right font-mono font-bold text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                                 value={opt.price}
                                 onChange={(e) => updateModuleOptionPrice(mIdx, oIdx, e.target.value)}
@@ -1074,71 +1089,24 @@ export const AdminPage = () => {
   );
 };
 
-// --- 10. 頁面元件：結算作業 (恢復完整版) ---
+// --- 10. 頁面元件：結算作業 (修正標籤顯示與更新邏輯) ---
 export const SettlementPage = () => {
   const { orders, dailySummaries, setDailySummaries, setOrders, showAlert, showConfirm, shift, setShift } = useContext(POSContext);
   const [expandOrderId, setExpandOrderId] = useState(null);
 
   const currentShiftCompletedOrders = useMemo(() =>
+    // Fix: 確保日期比對使用相同格式 (YYYY-MM-DD)
     orders.filter(o => o.date === shift.businessDate && (o.paymentStatus === 'paid' || o.isVoided)),
     [orders, shift.businessDate]);
 
   const totalRevenue = currentShiftCompletedOrders.filter(o => !o.isVoided).reduce((s, o) => s + o.total, 0);
 
-  // 計算統計數據
-  const stats = useMemo(() => {
-    return currentShiftCompletedOrders.reduce((acc, order) => {
-      if (order.isVoided) {
-        acc.voidedCount += 1;
-      } else {
-        acc.orderCount += 1;
-        acc.typeCount[order.orderType || 'dineIn'] += 1;
-        order.items?.forEach(item => {
-          acc.itemSales[item.name] = (acc.itemSales[item.name] || 0) + (item.quantity || 1);
-        });
-      }
-      return acc;
-    }, { orderCount: 0, voidedCount: 0, itemSales: {}, typeCount: { dineIn: 0, takeOut: 0 } });
-  }, [currentShiftCompletedOrders]);
-
-  const performSettlement = (businessDate, allOrders) => {
-    const targetOrders = allOrders.filter(o => o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided));
-    if (targetOrders.length === 0) return;
-
-    const summary = targetOrders.reduce((acc, order) => {
-      if (order.isVoided) { acc.voidedCount += 1; }
-      else {
-        acc.total += order.total; acc.orderCount += 1; acc.typeCount[order.orderType || 'dineIn'] += 1;
-        order.items?.forEach(item => { acc.itemSales[item.name] = (acc.itemSales[item.name] || 0) + (item.quantity || 1); });
-      }
-      acc.relatedOrders.push(order);
-      return acc;
-    }, { total: 0, orderCount: 0, voidedCount: 0, itemSales: {}, typeCount: { dineIn: 0, takeOut: 0 }, relatedOrders: [] });
-
-    setDailySummaries(prev => {
-      const updated = [...prev];
-      const existingIdx = updated.findIndex(s => s.date === businessDate);
-      if (existingIdx > -1) {
-        const existing = { ...updated[existingIdx] };
-        existing.total += summary.total; existing.orderCount += summary.orderCount; existing.voidedCount += summary.voidedCount; existing.closedAt = new Date().toLocaleString();
-        Object.entries(summary.itemSales).forEach(([n, q]) => { existing.itemSales[n] = (existing.itemSales[n] || 0) + q; });
-        existing.typeCount.dineIn += summary.typeCount.dineIn; existing.typeCount.takeOut += summary.typeCount.takeOut;
-        existing.relatedOrders = [...(existing.relatedOrders || []), ...summary.relatedOrders];
-        updated[existingIdx] = existing;
-      } else {
-        updated.push({ id: Date.now(), date: businessDate, ...summary, closedAt: new Date().toLocaleString() });
-      }
-      return updated;
-    });
-    setOrders(prev => prev.map(o => (o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided)) ? { ...o, status: 'closed' } : o));
-    setShift({ isOpen: false, businessDate: null, openedAt: null });
-  };
-
-  // 修正：新增 "先行結算" 專用函數 (不關閉班次)
+  // 修正：先行結算 (將狀態改為 closed，但保持班次開啟)
   const handlePreSettle = (businessDate, allOrders) => {
     const targetOrders = allOrders.filter(o => o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided));
     if (targetOrders.length === 0) return;
 
+    // 計算當日總結
     const summary = targetOrders.reduce((acc, order) => {
       if (order.isVoided) { acc.voidedCount += 1; }
       else {
@@ -1153,23 +1121,30 @@ export const SettlementPage = () => {
       const updated = [...prev];
       const existingIdx = updated.findIndex(s => s.date === businessDate);
       if (existingIdx > -1) {
-        // 更新現有報表
+        // 更新現有日報表
         const existing = { ...updated[existingIdx] };
-        // 這裡簡化處理：直接覆蓋數據（因為是重新計算當日總量）
-        // 注意：真實情境可能需要更複雜的合併邏輯，這裡假設每次都重算當日所有 unclosed 訂單
         existing.total = summary.total;
         existing.orderCount = summary.orderCount;
         existing.relatedOrders = summary.relatedOrders;
-        // ... 其他欄位更新
         updated[existingIdx] = existing;
       } else {
+        // Fix: 使用統一的日期時間格式
         updated.push({ id: Date.now(), date: businessDate, ...summary, closedAt: '未關帳 (預覽)' });
       }
       return updated;
     });
+
     // 關鍵修正：將這些訂單標記為 'closed' (已結算)，讓 UI 標籤變色
     setOrders(prev => prev.map(o => (o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided)) ? { ...o, status: 'closed' } : o));
-    showAlert('成功', '已更新當日報表預覽，班次仍保持開啟。', 'success');
+
+    // 注意：這裡不呼叫 setShift(isOpen: false)，所以班次保持開啟
+    showAlert('成功', '已執行先行結算，訂單狀態已更新。', 'success');
+  };
+
+  const performSettlement = (businessDate, allOrders) => {
+    // 日結關帳邏輯：與先行結算類似，但會關閉班次
+    handlePreSettle(businessDate, allOrders); // 先結算
+    setShift({ isOpen: false, businessDate: null, openedAt: null }); // 再關班
   };
 
   const renderItemDetails = (items) => (items || []).map((item, idx) => (
@@ -1200,14 +1175,6 @@ export const SettlementPage = () => {
         <div className="bg-white p-10 rounded-3xl border border-slate-100 flex flex-col justify-center shadow-sm"><p className="text-sm font-bold uppercase tracking-widest mb-4 text-slate-400 font-black">當前班次支付分佈</p><div className="space-y-3 font-sans font-medium">{['Cash', 'Credit', 'Mobile'].map(pm => (<div key={pm} className="flex justify-between items-center text-sm font-medium"><span className="uppercase text-[10px] text-slate-400 font-black">{pm === 'Cash' ? '現金' : pm === 'Credit' ? '刷卡' : '支付'}</span><span className="font-black text-slate-700 font-mono">${currentShiftCompletedOrders.filter(o => o.paymentMethod === pm && !o.isVoided).reduce((s, o) => s + o.total, 0)}</span></div>))}</div></div>
       </div>
 
-      {/* 新增：統計區塊 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 shrink-0">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-[10px] font-black uppercase mb-4 text-slate-400 tracking-widest">銷量統計</h4><div className="space-y-2 max-h-32 overflow-y-auto scrollbar-thin">{Object.entries(stats.itemSales || {}).map(([name, count]) => (<div key={name} className="flex justify-between items-center text-sm font-medium"><span className="text-slate-600">{name}</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{count}</span></div>))}</div></div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-xs font-bold uppercase mb-4 flex items-center text-orange-500"><Utensils size={14} className="mr-2 text-orange-500" /> 內外帶</h4><div className="space-y-4"><div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-600">內用</span><span className="font-black text-blue-600">{stats.typeCount?.dineIn || 0}</span></div><div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-600">外帶</span><span className="font-black text-orange-600">{stats.typeCount?.takeOut || 0}</span></div></div></div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-[10px] font-black uppercase mb-4 text-slate-400 tracking-widest text-red-500">異常統計</h4><span className="text-2xl font-black text-red-600 font-mono">{stats.voidedCount || 0}</span><p className="text-[10px] text-slate-400 mt-2 italic font-mono">Voided Orders</p></div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center"><span className="text-xs uppercase font-black block mb-1 text-slate-400 tracking-widest">平均客單</span><span className="text-2xl font-black text-slate-900 tracking-tight font-mono font-mono font-mono font-mono font-mono">${stats.orderCount > 0 ? (totalRevenue / stats.orderCount).toFixed(0) : 0}</span><span className="text-[10px] mt-2 italic text-slate-400 font-mono">共計 {stats.orderCount} 筆</span></div>
-      </div>
-
       <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-thin">
         <div className="space-y-3">
           <h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2 tracking-widest">當日交易明細 ({currentShiftCompletedOrders.length})</h3>
@@ -1217,10 +1184,14 @@ export const SettlementPage = () => {
               <div key={order.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${order.isVoided ? 'opacity-30' : 'border-blue-200 shadow-blue-50 shadow-sm'}`}>
                 <div onClick={() => setExpandOrderId(isOrderExpand ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
                   <div className="flex-1">
-                    <div className="font-bold flex items-center text-slate-700">#{order.orderNo || 'N/A'} - {order.date} <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}</span>
-                      {/* 修正：加入結算狀態標籤 */}
+                    <div className="font-bold flex items-center text-slate-700">
+                      #{order.orderNo || 'N/A'} - {order.date}
+                      <span className={`ml-3 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                        {order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}
+                      </span>
+                      {/* UI Fix: 明確的結算狀態標籤 (未結算為綠色，已結算為灰色) */}
                       {order.status === 'closed' ? (
-                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-gray-200 text-gray-500">已結算</span>
+                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-gray-200 text-gray-600">已結算</span>
                       ) : (
                         <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-green-100 text-green-600 animate-pulse">未結算</span>
                       )}
@@ -1285,7 +1256,7 @@ export const DashboardPage = () => {
                         return (
                           <div key={order.id} className={`bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm ${order.isVoided ? 'opacity-40 grayscale' : ''}`}>
                             <div onClick={(e) => { e.stopPropagation(); setExpandOrderId(isOrderExpand ? null : order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
-                              <div className="flex flex-col flex-1"><span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>號碼 #{order.orderNo || 'N/A'}</span><span className="text-[10px] text-slate-400">{order.time}</span></div>
+                              <div className="flex-col flex-1"><span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>號碼 #{order.orderNo || 'N/A'}</span><span className="text-[10px] text-slate-400">{order.time}</span></div>
                               <div className="flex-1">{order.isVoided ? <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">已作廢</span> : (order.orderType === 'takeOut' ? <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold">外帶</span> : <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-1 rounded-md font-bold">內用</span>)}</div>
                               <div className="text-lg font-black mr-4 text-slate-800 font-mono">${order.total}</div>
                               <ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} />
