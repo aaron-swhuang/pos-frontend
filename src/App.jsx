@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 
 // --- Helpers: 統一日期與時間格式 ---
-// 格式: YYYY-MM-DD (補零)
 const getTodayDate = () => {
   const date = new Date();
   const year = date.getFullYear();
@@ -21,7 +20,6 @@ const getTodayDate = () => {
   return `${year}-${month}-${day}`;
 };
 
-// 格式: HH:mm:ss
 const getCurrentTime = () => {
   const date = new Date();
   const hours = String(date.getHours()).padStart(2, '0');
@@ -30,7 +28,6 @@ const getCurrentTime = () => {
   return `${hours}:${minutes}:${seconds}`;
 };
 
-// 格式: YYYY-MM-DD HH:mm:ss
 const getCurrentDateTime = () => {
   return `${getTodayDate()} ${getCurrentTime()}`;
 };
@@ -69,17 +66,23 @@ class ErrorBoundary extends React.Component {
               系統發生錯誤 (System Error)
             </h1>
             <p className="mb-4 text-slate-600 font-bold">請將下方的錯誤訊息複製給開發者，或嘗試點擊下方的重置按鈕。</p>
+
             <div className="bg-slate-900 text-green-400 p-4 rounded-xl overflow-auto text-xs font-mono mb-6 max-h-64">
               <p className="font-bold border-b border-white/20 pb-2 mb-2">{this.state.error && this.state.error.toString()}</p>
               <pre>{this.state.errorInfo && this.state.errorInfo.componentStack}</pre>
             </div>
-            <button onClick={this.handleReset} className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+
+            <button
+              onClick={this.handleReset}
+              className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
               <Trash2 size={20} /> 清除所有資料並重置 (Reset Data)
             </button>
           </div>
         </div>
       );
     }
+
     return this.props.children;
   }
 }
@@ -125,10 +128,15 @@ export const POSProvider = ({ children }) => {
     try {
       const saved = localStorage.getItem(key);
       if (!saved || saved === "undefined" || saved === "null") return defaultValue;
+
       const parsed = JSON.parse(saved);
-      if (Array.isArray(defaultValue) && !Array.isArray(parsed)) return defaultValue;
+      if (Array.isArray(defaultValue) && !Array.isArray(parsed)) {
+        return defaultValue;
+      }
       return parsed;
-    } catch (e) { return defaultValue; }
+    } catch (e) {
+      return defaultValue;
+    }
   };
 
   const [modifierTemplates, setModifierTemplates] = useState(() => safeJsonParse('pos_templates', [
@@ -794,7 +802,7 @@ export const POSPage = () => {
   );
 };
 
-// --- 8. OrderManagementPage (補回遺漏的頁面，修正展開顯示) ---
+// --- 8. OrderManagementPage ---
 export const OrderManagementPage = () => {
   const { orders, setOrders, shift, showAlert } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
@@ -804,22 +812,55 @@ export const OrderManagementPage = () => {
   const history = orders.filter(o => o.status === 'unclosed' && (o.paymentStatus === 'paid' || o.isVoided));
   const handleActionClick = (actionFn) => { if (!shift.isOpen) { showAlert('操作鎖定', '目前班次已結清休息中，無法修改。', 'danger'); return; } actionFn(); };
   return (<div className="max-w-6xl h-full flex flex-col overflow-hidden text-slate-900 font-sans"><div className="flex justify-between items-end mb-8 shrink-0"><div><h2 className="text-3xl font-black text-slate-800 uppercase tracking-tight">訂單管理</h2><p className="text-slate-400 mt-1 flex items-center gap-2 font-medium">目前未日結交易清單 {!shift.isOpen && <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-black">班次鎖定</span>}</p></div><div className="flex gap-4 font-bold"><div className="bg-amber-50 px-8 py-4 rounded-3xl text-right border border-amber-100 text-amber-700 shadow-sm"><p className="text-[10px] uppercase font-black text-amber-500">待收</p><p className="text-2xl font-black font-mono">${pending.reduce((s, o) => s + o.total, 0)}</p></div><div className="bg-blue-50 px-8 py-4 rounded-3xl text-right border border-blue-100 text-blue-700 shadow-sm"><p className="text-[10px] uppercase font-black text-blue-500">實收</p><p className="text-2xl font-black font-mono">${history.filter(o => !o.isVoided).reduce((s, o) => s + o.total, 0)}</p></div></div></div><div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-10 overflow-hidden"><div className="flex flex-col min-h-0"><h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2 tracking-widest"><AlertCircle size={16} className="text-amber-500" /> 待收款區 ({pending.length})</h3><div className="flex-1 overflow-y-auto space-y-4 pb-10 pr-2 scrollbar-thin">{pending.map(o => (
-    <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-6 rounded-[2rem] border transition-all cursor-pointer ${expandedId === o.id ? 'ring-2 ring-blue-500 shadow-xl' : 'border-slate-100 hover:border-blue-200'}`}><div className="flex justify-between items-center"><div><div className="flex items-center gap-2 mb-1.5 font-black text-xl text-slate-800">#{o.orderNo} <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-black">待付款</span></div><div className="text-xs text-slate-400 flex items-center gap-1 font-mono tracking-tight"><Clock size={12} />{o.date} {o.time}</div></div><div className="flex items-center gap-4"><button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={20} /></button><div className="text-right mx-2 font-sans"><p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">金額</p><p className="text-2xl font-black text-slate-800 font-mono">${o.total}</p></div><button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setActivePayOrder(o)); }} className={`bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-lg hover:bg-blue-600 transition-all text-sm uppercase ${!shift.isOpen ? 'opacity-30' : ''}`}>前往付款 PAY</button></div></div>{expandedId === o.id && <div className="mt-6 pt-5 border-t border-slate-100 space-y-2">{(o.items || []).map((it, idx) => (<div key={idx} className="flex justify-between text-sm text-slate-600 font-medium font-sans">
-      <div className="flex flex-col">
-        <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
-        <div className="flex flex-wrap gap-1 mt-1">
-          {Object.values(it.selectedModules || {}).map((m, i) => (<span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-500">{m.name}</span>))}
+    <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-6 rounded-[2rem] border transition-all cursor-pointer ${expandedId === o.id ? 'ring-2 ring-blue-500 shadow-xl' : 'border-slate-100 hover:border-blue-200'}`}><div className="flex justify-between items-center"><div><div className="flex items-center gap-2 mb-1.5 font-black text-xl text-slate-800">#{o.orderNo} <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-black">待付款</span></div><div className="text-xs text-slate-400 flex items-center gap-1 font-mono tracking-tight"><Clock size={12} />{o.date} {o.time}</div></div><div className="flex items-center gap-4"><button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={20} /></button><div className="text-right mx-2 font-sans"><p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">金額</p><p className="text-2xl font-black text-slate-800 font-mono">${o.total}</p></div><button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setActivePayOrder(o)); }} className={`bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-lg hover:bg-blue-600 transition-all text-sm uppercase ${!shift.isOpen ? 'opacity-30' : ''}`}>前往付款 PAY</button></div></div>
+      {expandedId === o.id && (
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <div className="space-y-2 mb-4">
+            {(o.items || []).map((it, idx) => (
+              <div key={idx} className="flex justify-between text-sm text-slate-600 font-medium font-sans">
+                <div className="flex flex-col">
+                  <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Object.values(it.selectedModules || {}).map((m, i) => (<span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-500">{m.name}</span>))}
+                  </div>
+                </div>
+                <span className="font-bold text-slate-800 font-mono">${it.price * it.quantity}</span>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-slate-100 pt-4 space-y-1">
+            <div className="flex justify-between text-xs text-slate-400"><span>小計</span><span>${o.total + (o.discount || 0)}</span></div>
+            {o.discount > 0 && <div className="flex justify-between text-xs text-red-400"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
+            <div className="flex justify-between font-black text-slate-800 text-base"><span>總計</span><span>${o.total}</span></div>
+          </div>
         </div>
-      </div>
-      <span className="font-bold text-slate-800 font-mono">${it.price * it.quantity}</span></div>))}</div>}</div>))}</div></div><div className="flex flex-col min-h-0"><h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2 tracking-widest"><CheckCircle2 size={16} className="text-blue-500" /> 已付清 / 已作廢 (未結算)</h3><div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">{[...history].reverse().map(o => (
-        <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-5 rounded-[1.5rem] border border-slate-100 transition-all cursor-pointer ${o.isVoided ? 'opacity-40 grayscale bg-slate-50 border-dashed' : 'hover:bg-blue-50/30'}`}><div className="flex justify-between items-center"><div className="flex items-center gap-4"><div className={`p-2 rounded-xl ${o.isVoided ? 'bg-slate-200 text-slate-400' : 'bg-blue-50 text-blue-500'}`}>{o.orderType === 'takeOut' ? <ShoppingBag size={22} /> : <Utensils size={22} />}</div><div><div className={`font-black text-base text-slate-800 ${o.isVoided ? 'line-through opacity-50' : ''}`}>#{o.orderNo}</div><div className="text-[10px] text-slate-400 font-mono tracking-tight">{o.date} {o.time}</div></div></div><div className="flex items-center gap-5">{!o.isVoided && <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={18} /></button>}<div className="text-right font-sans"><div className={`text-xl font-black font-mono font-mono font-mono ${o.isVoided ? 'text-slate-400' : 'text-slate-800'}`}>${o.total}</div><div className={`text-[10px] font-black uppercase tracking-widest ${o.isVoided ? 'text-red-500' : 'text-blue-400'}`}>{o.isVoided ? 'VOID' : (o.paymentMethod || 'PAID')}</div></div></div></div>{expandedId === o.id && <div className="mt-5 pt-4 border-t border-slate-100 text-[10px] space-y-2 font-sans">{o.isVoided && <div className="bg-red-50 p-2.5 rounded-xl text-red-600 font-bold border border-red-100 flex items-center gap-2 uppercase tracking-wide"><AlertTriangle size={12} />Reason: {o.voidReason}</div>}{o.items?.map((it, idx) => (<div key={idx} className="flex justify-between px-1 text-slate-600 font-medium">
-          <div className="flex flex-col">
-            <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {Object.values(it.selectedModules || {}).map((m, i) => (<span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-500">{m.name}</span>))}
+      )}
+    </div>))}</div></div><div className="flex flex-col min-h-0"><h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2 tracking-widest"><CheckCircle2 size={16} className="text-blue-500" /> 已付清 / 已作廢 (未結算)</h3><div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">{[...history].reverse().map(o => (
+      <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-5 rounded-[1.5rem] border border-slate-100 transition-all cursor-pointer ${o.isVoided ? 'opacity-40 grayscale bg-slate-50 border-dashed' : 'hover:bg-blue-50/30'}`}><div className="flex justify-between items-center"><div className="flex items-center gap-4"><div className={`p-2 rounded-xl ${o.isVoided ? 'bg-slate-200 text-slate-400' : 'bg-blue-50 text-blue-500'}`}>{o.orderType === 'takeOut' ? <ShoppingBag size={22} /> : <Utensils size={22} />}</div><div><div className={`font-black text-base text-slate-800 ${o.isVoided ? 'line-through opacity-50' : ''}`}>#{o.orderNo}</div><div className="text-[10px] text-slate-400 font-mono tracking-tight">{o.date} {o.time}</div></div></div><div className="flex items-center gap-5">{!o.isVoided && <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={18} /></button>}<div className="text-right font-sans"><div className={`text-xl font-black font-mono font-mono font-mono ${o.isVoided ? 'text-slate-400' : 'text-slate-800'}`}>${o.total}</div><div className={`text-[10px] font-black uppercase tracking-widest ${o.isVoided ? 'text-red-500' : 'text-blue-400'}`}>{o.isVoided ? 'VOID' : (o.paymentMethod || 'PAID')}</div></div></div></div>
+        {expandedId === o.id && (
+          <div className="mt-5 pt-4 border-t border-slate-100 text-[10px] space-y-2 font-sans">
+            {o.isVoided && <div className="bg-red-50 p-2.5 rounded-xl text-red-600 font-bold border border-red-100 flex items-center gap-2 uppercase tracking-wide"><AlertTriangle size={12} />Reason: {o.voidReason}</div>}
+            <div className="space-y-2 mb-4">
+              {(o.items || []).map((it, idx) => (
+                <div key={idx} className="flex justify-between px-1 text-slate-600 font-medium">
+                  <div className="flex flex-col">
+                    <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {Object.values(it.selectedModules || {}).map((m, i) => (<span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-500">{m.name}</span>))}
+                    </div>
+                  </div>
+                  <span className="font-bold text-slate-900 font-mono">${it.price * it.quantity}</span>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-slate-100 pt-2 space-y-1">
+              <div className="flex justify-between text-slate-400"><span>小計</span><span>${o.total + (o.discount || 0)}</span></div>
+              {o.discount > 0 && <div className="flex justify-between text-red-400"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
+              <div className="flex justify-between font-black text-slate-800 text-sm mt-1"><span>總計</span><span>${o.total}</span></div>
             </div>
           </div>
-          <span className="font-bold text-slate-900 font-mono">${it.price * it.quantity}</span></div>))}</div>}</div>))}</div></div></div><CheckoutModal isOpen={!!activePayOrder} onClose={() => setActivePayOrder(null)} cartTotal={activePayOrder?.total || 0} items={activePayOrder?.items || []} onConfirm={(d) => { setOrders(prev => prev.map(o => o.id === activePayOrder.id ? { ...o, ...d, paymentStatus: 'paid', status: 'unclosed' } : o)); setActivePayOrder(null); }} /><VoidReasonModal isOpen={!!voidId} onClose={() => setVoidId(null)} onConfirm={(r) => { setOrders(prev => prev.map(o => o.id === voidId ? { ...o, isVoided: true, voidReason: r } : o)); setVoidId(null); }} /></div>);
+        )}
+      </div>))}</div></div></div><CheckoutModal isOpen={!!activePayOrder} onClose={() => setActivePayOrder(null)} cartTotal={activePayOrder?.total || 0} items={activePayOrder?.items || []} onConfirm={(d) => { setOrders(prev => prev.map(o => o.id === activePayOrder.id ? { ...o, ...d, paymentStatus: 'paid', status: 'unclosed' } : o)); setActivePayOrder(null); }} /><VoidReasonModal isOpen={!!voidId} onClose={() => setVoidId(null)} onConfirm={(r) => { setOrders(prev => prev.map(o => o.id === voidId ? { ...o, isVoided: true, voidReason: r } : o)); setVoidId(null); }} /></div>);
 };
 
 // --- 9. AdminPage (排版還原與邏輯修復) ---
@@ -1316,7 +1357,12 @@ export const SettlementPage = () => {
                 {isOrderExpand && (
                   <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in">
                     <div className="space-y-2">{renderItemDetails(order.items)}</div>
-                    <div className="mt-4 pt-4 border-t flex justify-between font-black text-slate-900"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div>
+                    {/* 修正：加入優惠折抵顯示 */}
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
+                      <div className="flex justify-between text-xs text-slate-400"><span>小計</span><span>${order.total + (order.discount || 0)}</span></div>
+                      {order.discount > 0 && <div className="flex justify-between text-xs text-red-400"><span>折扣 {order.discountName && `(${order.discountName})`}</span><span>-${order.discount}</span></div>}
+                      <div className="flex justify-between font-black text-slate-900 text-base mt-2"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1395,7 +1441,17 @@ export const DashboardPage = () => {
                               <div className="text-lg font-black mr-4 text-slate-800 font-mono">${order.total}</div>
                               <ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} />
                             </div>
-                            {isOrderExpand && (<div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in">{renderItemDetails(order.items)}</div>)}
+                            {isOrderExpand && (
+                              <div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in">
+                                <div className="space-y-2">{renderItemDetails(order.items)}</div>
+                                {/* 修正：加入優惠折抵顯示 */}
+                                <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
+                                  <div className="flex justify-between text-xs text-slate-400"><span>小計</span><span>${order.total + (order.discount || 0)}</span></div>
+                                  {order.discount > 0 && <div className="flex justify-between text-xs text-red-400"><span>折扣 {order.discountName && `(${order.discountName})`}</span><span>-${order.discount}</span></div>}
+                                  <div className="flex justify-between font-black text-slate-800 text-base mt-2"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1526,6 +1582,15 @@ export const DatabaseViewPage = () => {
                           <div className="grid grid-cols-2 gap-3 text-[10px]">
                             <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1">內部唯一 ID</p><p className="font-mono text-slate-600">{o.id}</p></div>
                             <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1">交易類型</p><p className="font-bold text-slate-600">{o.orderType === 'takeOut' ? '🥡 外帶' : '🍽️ 內用'}</p></div>
+
+                            {/* 新增：顯示金額摘要 (小計、折扣、總計) */}
+                            <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2">
+                              <p className="text-slate-400 font-bold mb-2 border-b border-slate-100 pb-1">財務摘要</p>
+                              <div className="flex justify-between mb-1"><span className="text-slate-500">小計</span><span className="font-mono">${o.total + (o.discount || 0)}</span></div>
+                              {o.discount > 0 && <div className="flex justify-between mb-1 text-red-500"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
+                              <div className="flex justify-between font-black text-slate-800 border-t border-slate-100 pt-1"><span>最終總額</span><span>${o.total}</span></div>
+                            </div>
+
                             {o.isVoided && (<div className="bg-red-50 p-3 rounded-xl border border-red-100 col-span-2"><p className="text-red-400 font-bold mb-1 flex items-center gap-1"><AlertCircle size={10} /> 作廢原因</p><p className="font-bold text-red-700">{o.voidReason || '未註記'}</p></div>)}
                           </div>
                         </div>
