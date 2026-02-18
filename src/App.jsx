@@ -309,6 +309,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
         setSelectedModules(initialData.selectedModules || {});
       } else {
         const defaults = {};
+        // 修正：不強制預設選取 Variant
         setSelectedModules(defaults);
       }
     }
@@ -352,6 +353,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
 
   const handleSelectOption = (moduleName, option, type) => {
     setSelectedModules(prev => {
+      // 修正：允許反選 (取消選擇)
       if (prev[moduleName]?.name === option.name) {
         const next = { ...prev };
         delete next[moduleName];
@@ -474,6 +476,7 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
                 <div key={idx} className="flex justify-between text-sm text-slate-600 border-b border-slate-100 py-3 last:border-0">
                   <div className="flex flex-col max-w-[70%]">
                     <span className="font-bold text-slate-800 truncate">{item.name}</span>
+                    {/* 修正：只顯示選項名稱，不顯示模組名稱 */}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {Object.values(item.selectedModules || {}).map((val, i) => val ? (
                         <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
@@ -573,7 +576,7 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
   );
 };
 
-// --- 4. VoidReasonModal ---
+// --- 4. VoidReasonModal (移到 OrderManagementPage 之前) ---
 export const VoidReasonModal = ({ isOpen, onClose, onConfirm }) => {
   const [reason, setReason] = useState('');
   if (!isOpen) return null;
@@ -609,7 +612,7 @@ export const LoginPage = () => {
     if (auth.user === 'admin' && auth.pass === 'posadmin') {
       setIsLoggedIn(true);
     } else {
-      showAlert('登入失敗', '帳號或密碼錯誤。預設帳號為 admin，密碼為 posadmin。', 'danger');
+      showAlert('登入失敗', '帳號密碼錯誤', 'danger');
     }
   };
 
@@ -797,7 +800,7 @@ export const POSPage = () => {
   );
 };
 
-// --- 8. OrderManagementPage ---
+// --- 8. OrderManagementPage (補回遺漏的頁面) ---
 export const OrderManagementPage = () => {
   const { orders, setOrders, shift, showAlert } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
@@ -824,8 +827,10 @@ export const AdminPage = () => {
 
   // 新增：編輯模組狀態
   const [editingTemplateId, setEditingTemplateId] = useState(null);
+  // 新增：編輯優惠狀態
+  const [editingDiscountId, setEditingDiscountId] = useState(null);
 
-  // 控制模組選擇器顯示
+  // 控制模組選擇器顯示 (Fix: 使用 State 控制顯示)
   const [showModuleSelector, setShowModuleSelector] = useState(false);
 
   const loadEditItem = (i) => {
@@ -856,7 +861,15 @@ export const AdminPage = () => {
   const handleDiscountSubmit = (e) => {
     e.preventDefault();
     if (!newDisc.name || !newDisc.value) return;
-    setDiscountRules([...discountRules, { id: Date.now(), name: newDisc.name, type: newDisc.type, value: parseFloat(newDisc.value) }]);
+
+    if (editingDiscountId) {
+      setDiscountRules(prev => prev.map(d =>
+        d.id === editingDiscountId ? { ...d, name: newDisc.name, type: newDisc.type, value: parseFloat(newDisc.value) } : d
+      ));
+      setEditingDiscountId(null);
+    } else {
+      setDiscountRules([...discountRules, { id: Date.now(), name: newDisc.name, type: newDisc.type, value: parseFloat(newDisc.value) }]);
+    }
     setNewDisc({ name: '', type: 'percentage', value: '' });
   };
 
@@ -886,6 +899,16 @@ export const AdminPage = () => {
       optionsStr: template.options.join(', ')
     });
     setEditingTemplateId(template.id);
+  };
+
+  // 優惠管理: 載入編輯
+  const handleEditDiscount = (discount) => {
+    setNewDisc({
+      name: discount.name,
+      type: discount.type,
+      value: discount.value
+    });
+    setEditingDiscountId(discount.id);
   };
 
   // 商品編輯功能：加入模組
@@ -1091,7 +1114,7 @@ export const AdminPage = () => {
         <div className="h-full flex gap-6">
           {/* 左側表單 (還原) */}
           <form onSubmit={handleDiscountSubmit} className="w-1/3 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-fit">
-            <h3 className="font-bold text-lg mb-4">新增優惠</h3>
+            <h3 className="font-bold text-lg mb-4">{editingDiscountId ? '編輯優惠' : '新增優惠'}</h3>
             <div className="space-y-4">
               <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">名稱</label><input className="w-full px-3 py-2 bg-slate-50 border rounded-xl" value={newDisc.name} onChange={e => setNewDisc({ ...newDisc, name: e.target.value })} /></div>
               <div>
@@ -1099,20 +1122,30 @@ export const AdminPage = () => {
                 <select className="w-full px-3 py-2 bg-slate-50 border rounded-xl" value={newDisc.type} onChange={e => setNewDisc({ ...newDisc, type: e.target.value })}><option value="percentage">折扣 (%)</option><option value="amount">定額折抵 ($)</option></select>
               </div>
               <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">數值</label><input type="number" step="0.01" className="w-full px-3 py-2 bg-slate-50 border rounded-xl" value={newDisc.value} onChange={e => setNewDisc({ ...newDisc, value: e.target.value })} /></div>
-              <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg mt-2">新增</button>
+
+              <div className="flex gap-2">
+                {editingDiscountId && (
+                  <button type="button" onClick={() => { setEditingDiscountId(null); setNewDisc({ name: '', type: 'percentage', value: '' }); }} className="flex-1 py-3 bg-slate-100 text-slate-500 rounded-xl font-bold">取消</button>
+                )}
+                <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg mt-2">{editingDiscountId ? '儲存變更' : '新增'}</button>
+              </div>
             </div>
           </form>
           {/* 右側列表 (還原) */}
           <div className="flex-1 overflow-y-auto space-y-3">
             {discountRules.map(r => (
-              <div key={r.id} className="bg-white p-5 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
+              <div key={r.id} className={`bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm transition-all ${editingDiscountId === r.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-100'}`}>
                 <div className="flex items-center gap-4">
                   <div className="bg-blue-50 text-blue-600 p-2 rounded-lg"><Ticket size={20} /></div>
                   <div><div className="font-bold text-slate-800">{r.name}</div><div className="text-xs text-slate-400">{r.type === 'percentage' ? '比例折扣' : '定額折抵'}</div></div>
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="font-black text-xl text-blue-600 font-mono">{r.type === 'percentage' ? `${Math.round((1 - r.value) * 100)}%` : `-$${r.value}`}</span>
-                  <button onClick={() => setDiscountRules(discountRules.filter(d => d.id !== r.id))} className="text-slate-300 hover:text-red-500"><Trash2 size={18} /></button>
+                  <button onClick={() => handleEditDiscount(r)} className="text-blue-400 hover:text-blue-600"><Edit2 size={18} /></button>
+                  <button onClick={() => {
+                    if (editingDiscountId === r.id) { setEditingDiscountId(null); setNewDisc({ name: '', type: 'percentage', value: '' }); }
+                    setDiscountRules(discountRules.filter(d => d.id !== r.id));
+                  }} className="text-slate-300 hover:text-red-500"><Trash2 size={18} /></button>
                 </div>
               </div>
             ))}
