@@ -484,7 +484,6 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
                 <div key={idx} className="flex justify-between text-sm text-slate-600 border-b border-slate-100 py-3 last:border-0">
                   <div className="flex flex-col max-w-[70%]">
                     <span className="font-bold text-slate-800 truncate">{item.name}</span>
-                    {/* 修正：只顯示選項名稱，不顯示模組名稱 */}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {Object.values(item.selectedModules || {}).map((val, i) => val ? (
                         <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
@@ -809,7 +808,7 @@ export const POSPage = () => {
   );
 };
 
-// --- 8. OrderManagementPage (修正明細) ---
+// --- 8. OrderManagementPage ---
 export const OrderManagementPage = () => {
   const { orders, setOrders, shift, showAlert } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
@@ -1009,7 +1008,7 @@ export const AdminPage = () => {
   return (
     <div className="max-w-4xl h-full flex flex-col overflow-hidden text-slate-900 font-sans">
       <div className="flex justify-between items-center mb-6 shrink-0">
-        <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">店務管理系統</h2>
+        <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">店務管理</h2>
         <div className="bg-slate-100 p-1.5 rounded-2xl flex font-bold border border-slate-200">
           <button onClick={() => setTab('menu')} className={`px-6 py-2 rounded-xl text-sm transition-all ${tab === 'menu' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>菜單設定</button>
           <button onClick={() => setTab('modules')} className={`px-6 py-2 rounded-xl text-sm transition-all ${tab === 'modules' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>客製模組</button>
@@ -1387,6 +1386,15 @@ export const DashboardPage = () => {
 
   // Fix: 這裡也需要 state 來管理內部訂單的展開
   const [expandedOrderIds, setExpandedOrderIds] = useState(new Set());
+  const [searchDate, setSearchDate] = useState('');
+
+  const filteredSummaries = useMemo(() => {
+    let data = [...dailySummaries];
+    if (searchDate) {
+      data = data.filter(s => s.date === searchDate);
+    }
+    return data.reverse();
+  }, [dailySummaries, searchDate]);
 
   const toggleOrderExpand = (orderId) => {
     setExpandedOrderIds(prev => {
@@ -1418,13 +1426,35 @@ export const DashboardPage = () => {
   return (
     <div className="max-w-5xl h-full flex flex-col overflow-hidden text-slate-900 px-2 font-sans">
       <div className="flex justify-between items-center mb-6 shrink-0">
-        <h2 className="text-2xl font-black text-slate-800">歷史報表分析</h2>
-        <p className="text-slate-400 font-medium">僅顯示已日結之歷史數據</p>
+        <div>
+          <h2 className="text-2xl font-black text-slate-800">歷史報表分析</h2>
+          <p className="text-slate-400 font-medium text-sm mt-1">僅顯示已日結之歷史數據</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {searchDate && (
+            <button
+              onClick={() => setSearchDate('')}
+              className="flex items-center gap-1 text-slate-400 hover:text-red-500 text-sm font-bold transition-colors"
+            >
+              <FilterX size={16} />
+              <span>清除篩選</span>
+            </button>
+          )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="date"
+              value={searchDate}
+              onChange={(e) => setSearchDate(e.target.value)}
+              className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-600 shadow-sm cursor-pointer w-40 sm:w-auto"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-thin">
         <div className="space-y-4">
-          {[...dailySummaries].reverse().map((summary, index) => (
+          {filteredSummaries.map((summary, index) => (
             <div key={`${summary.id}-${index}`} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all">
               <div onClick={() => setExpandSummaryId(expandSummaryId === summary.id ? null : summary.id)} className={`p-6 flex items-center justify-between cursor-pointer ${expandSummaryId === summary.id ? 'bg-blue-50/50' : ''}`}><div className="flex items-center space-x-4"><div className="bg-green-100 text-green-600 p-3 rounded-xl shadow-sm"><FileText /></div><div><div className="font-bold text-lg text-slate-800 tracking-tight">{summary.date} 彙整報表</div><div className="text-xs text-slate-400 font-medium font-mono opacity-60">最後結算：{summary.closedAt}</div></div></div><div className="flex items-center space-x-8"><div className="text-right"><div className="text-xs uppercase font-black text-slate-400 tracking-tighter">總金額</div><div className="text-2xl font-black text-blue-600 tracking-tight font-mono font-mono">${summary.total}</div></div>{expandSummaryId === summary.id ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}</div></div>
               {expandSummaryId === summary.id && (
@@ -1455,7 +1485,7 @@ export const DashboardPage = () => {
                                 <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
                                   <div className="flex justify-between text-xs text-slate-400"><span>小計</span><span>${order.total + (order.discount || 0)}</span></div>
                                   {order.discount > 0 && <div className="flex justify-between text-xs text-red-400"><span>折扣 {order.discountName && `(${order.discountName})`}</span><span>-${order.discount}</span></div>}
-                                  <div className="flex justify-between font-black text-slate-800 text-base mt-2"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div>
+                                  <div className="flex justify-between font-black text-slate-900 text-base mt-2"><span>應付總額</span><span className={order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}>${order.total}</span></div>
                                 </div>
                               </div>
                             )}
@@ -1468,6 +1498,7 @@ export const DashboardPage = () => {
               )}
             </div>
           ))}
+          {filteredSummaries.length === 0 && <div className="text-center py-10 text-slate-400">查無此日期的報表資料</div>}
         </div>
       </div>
     </div>
