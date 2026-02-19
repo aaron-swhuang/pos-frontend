@@ -484,6 +484,7 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
                 <div key={idx} className="flex justify-between text-sm text-slate-600 border-b border-slate-100 py-3 last:border-0">
                   <div className="flex flex-col max-w-[70%]">
                     <span className="font-bold text-slate-800 truncate">{item.name}</span>
+                    {/* 修正：只顯示選項名稱，不顯示模組名稱 */}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {Object.values(item.selectedModules || {}).map((val, i) => val ? (
                         <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
@@ -733,8 +734,29 @@ export const POSPage = () => {
       const orderDate = shift.businessDate;
       const c = orders.filter(o => o.date === orderDate && o.orderType === orderType).length;
       const orderNo = pref + (c + 1).toString().padStart(3, '0');
+
+      // NEW: Serial Number Generation (YYYYMMDD + 7 digit sequence)
+      const dateStr = orderDate.replace(/-/g, ''); // 2023-10-27 -> 20231027
+      // Count all orders for this date (regardless of type)
+      const dailyCount = orders.filter(o => o.date === orderDate).length;
+      const serialNo = `${dateStr}${(dailyCount + 1).toString().padStart(7, '0')}`;
+
       // Fix: 使用 getCurrentTime 統一時間格式 (HH:mm:ss)
-      const newO = { id: Date.now(), orderNo, total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0), items: [...cart], orderType, date: orderDate, time: getCurrentTime(), status: 'unclosed', isVoided: false, paymentStatus: (orderType === 'dineIn' && config?.dineInMode === 'postPay' && !data.paymentMethod) ? 'pending' : 'paid', ...data };
+      // Change id to UUID
+      const newO = {
+        id: crypto.randomUUID(),
+        serialNo, // Add serialNo
+        orderNo,
+        total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0),
+        items: [...cart],
+        orderType,
+        date: orderDate,
+        time: getCurrentTime(),
+        status: 'unclosed',
+        isVoided: false,
+        paymentStatus: (orderType === 'dineIn' && config?.dineInMode === 'postPay' && !data.paymentMethod) ? 'pending' : 'paid',
+        ...data
+      };
       setOrders(prev => [...prev, newO]); setCart([]); setIsCheckoutModalOpen(false);
     };
     if (orderType === 'dineIn' && config?.dineInMode === 'postPay' && !data.paymentMethod) showConfirm('送出點餐', '確定要送出此筆點餐清單並記錄為「待付款」嗎？', handleFinalize);
@@ -864,12 +886,17 @@ export const OrderManagementPage = () => {
               {o.discount > 0 && <div className="flex justify-between text-red-400"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
               <div className="flex justify-between font-black text-slate-800 text-sm mt-1"><span>總計</span><span>${o.total}</span></div>
             </div>
+            {/* NEW: Serial No and UUID */}
+            <div className="mt-3 pt-2 border-t border-slate-100 text-[9px] text-slate-400 font-mono flex flex-col gap-1">
+              <div>SN: {o.serialNo || 'N/A'}</div>
+              <div>UUID: {o.id}</div>
+            </div>
           </div>
         )}
       </div>))}</div></div></div><CheckoutModal isOpen={!!activePayOrder} onClose={() => setActivePayOrder(null)} cartTotal={activePayOrder?.total || 0} items={activePayOrder?.items || []} onConfirm={(d) => { setOrders(prev => prev.map(o => o.id === activePayOrder.id ? { ...o, ...d, paymentStatus: 'paid', status: 'unclosed' } : o)); setActivePayOrder(null); }} /><VoidReasonModal isOpen={!!voidId} onClose={() => setVoidId(null)} onConfirm={(r) => { setOrders(prev => prev.map(o => o.id === voidId ? { ...o, isVoided: true, voidReason: r } : o)); setVoidId(null); }} /></div>);
 };
 
-// --- 9. AdminPage (排版還原與邏輯修復) ---
+// --- 9. AdminPage ---
 export const AdminPage = () => {
   const { menu, setMenu, discountRules, setDiscountRules, showConfirm, modifierTemplates, setModifierTemplates } = useContext(POSContext);
   const [tab, setTab] = useState('menu');
@@ -1296,6 +1323,8 @@ export const SettlementPage = () => {
           {Object.values(item.selectedModules || {}).map((val, i) => (
             <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
               {val.name}
+              {/* 顯示選項價格 */}
+              {val.price > 0 && ` +$${val.price}`}
             </span>
           ))}
         </div>
@@ -1355,13 +1384,21 @@ export const SettlementPage = () => {
                         <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-green-100 text-green-600 animate-pulse">未結算</span>
                       )}
                     </div>
-                    <div className="text-xs font-mono italic text-slate-400">ID: {order.id} {order.isVoided && `| 原因: ${order.voidReason}`}</div>
+                    {/* NEW: Display Serial No and UUID (first 8 chars) */}
+                    <div className="text-xs font-mono italic text-slate-400 mt-1">
+                      SN: {order.serialNo || 'N/A'} <span className="mx-1 text-slate-300">|</span> ID: {typeof order.id === 'string' ? order.id.substring(0, 8) + '...' : order.id}
+                      {order.isVoided && ` | 原因: ${order.voidReason}`}
+                    </div>
                   </div>
                   <div className={`text-xl font-black mr-6 ${order.isVoided ? 'line-through text-slate-300' : 'text-blue-600'}`}>${order.total}</div>
                   <ChevronRight size={20} className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} />
                 </div>
                 {isOrderExpand && (
                   <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in">
+                    {/* NEW: Full UUID Display */}
+                    <div className="mb-4 p-3 bg-white border border-slate-100 rounded-xl text-[10px] text-slate-400 font-mono break-all">
+                      <strong className="text-slate-600">Full UUID:</strong> {order.id}
+                    </div>
                     <div className="space-y-2">{renderItemDetails(order.items)}</div>
                     {/* 修正：加入優惠折抵顯示 */}
                     <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
@@ -1379,7 +1416,7 @@ export const SettlementPage = () => {
   );
 };
 
-// --- 11. DashboardPage (修正展開邏輯) ---
+// --- 11. DashboardPage (修正展開邏輯 + 新增日期搜尋) ---
 export const DashboardPage = () => {
   const { dailySummaries } = useContext(POSContext);
   const [expandSummaryId, setExpandSummaryId] = useState(null);
@@ -1414,6 +1451,7 @@ export const DashboardPage = () => {
           {Object.values(item.selectedModules || {}).map((val, i) => (
             <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
               {val.name}
+              {val.price > 0 && ` +$${val.price}`}
             </span>
           ))}
         </div>
@@ -1430,6 +1468,7 @@ export const DashboardPage = () => {
           <h2 className="text-2xl font-black text-slate-800">歷史報表分析</h2>
           <p className="text-slate-400 font-medium text-sm mt-1">僅顯示已日結之歷史數據</p>
         </div>
+        {/* 新增日期搜尋區塊 */}
         <div className="flex items-center gap-3">
           {searchDate && (
             <button
@@ -1441,7 +1480,8 @@ export const DashboardPage = () => {
             </button>
           )}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            {/* Search Icon */}
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
             <input
               type="date"
               value={searchDate}
@@ -1473,13 +1513,24 @@ export const DashboardPage = () => {
                         return (
                           <div key={order.id} className={`bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm ${order.isVoided ? 'opacity-40 grayscale' : ''}`}>
                             <div onClick={(e) => { e.stopPropagation(); toggleOrderExpand(order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
-                              <div className="flex-col flex-1"><span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>號碼 #{order.orderNo || 'N/A'}</span><span className="text-[10px] text-slate-400">{order.time}</span></div>
+                              <div className="flex-col flex-1">
+                                <span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>
+                                  號碼 #{order.orderNo || 'N/A'}
+                                  {/* NEW: Serial No */}
+                                  <span className="text-[10px] font-normal text-slate-400 ml-2">SN: {order.serialNo || 'N/A'}</span>
+                                </span>
+                                <span className="text-[10px] text-slate-400">{order.time}</span>
+                              </div>
                               <div className="flex-1">{order.isVoided ? <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">已作廢</span> : (order.orderType === 'takeOut' ? <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold">外帶</span> : <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-1 rounded-md font-bold">內用</span>)}</div>
                               <div className="text-lg font-black mr-4 text-slate-800 font-mono">${order.total}</div>
                               <ChevronRight className={`text-slate-300 transition-transform ${isOrderExpand ? 'rotate-90' : ''}`} size={16} />
                             </div>
                             {isOrderExpand && (
                               <div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in">
+                                {/* NEW: Full UUID Display */}
+                                <div className="mb-4 p-3 bg-white border border-slate-100 rounded-xl text-[10px] text-slate-400 font-mono break-all">
+                                  <strong className="text-slate-600">Full UUID:</strong> {order.id}
+                                </div>
                                 <div className="space-y-2">{renderItemDetails(order.items)}</div>
                                 {/* 修正：加入優惠折抵顯示 */}
                                 <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
@@ -1562,7 +1613,7 @@ export const DatabaseViewPage = () => {
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10 shadow-sm">
               <tr>
                 <th className="p-4 w-12 text-center">#</th>
-                <th className="p-4">OrderNo</th>
+                <th className="p-4">OrderNo / Serial</th>
                 <th className="p-4">Date/Time</th>
                 <th className="p-4">Status</th>
                 <th className="p-4 text-right">Total</th>
@@ -1576,7 +1627,11 @@ export const DatabaseViewPage = () => {
                 <React.Fragment key={o.id}>
                   <tr onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`cursor-pointer transition-colors ${expandedId === o.id ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'}`}>
                     <td className="p-4 text-center"><ChevronRight size={14} className={`text-slate-300 transition-transform ${expandedId === o.id ? 'rotate-90 text-blue-500' : ''}`} /></td>
-                    <td className="p-4 font-bold text-slate-700">#{o.orderNo}</td>
+                    <td className="p-4 font-bold text-slate-700">
+                      <div>#{o.orderNo}</div>
+                      {/* NEW: Serial No */}
+                      <div className="text-[9px] text-slate-400 font-mono mt-0.5">{o.serialNo || 'N/A'}</div>
+                    </td>
                     <td className="p-4 text-slate-500 font-medium">{o.date} <span className="text-[10px] text-slate-300 ml-1">{o.time}</span></td>
                     <td className="p-4"><span className={`font-bold uppercase text-[9px] ${o.status === 'closed' ? 'text-slate-400' : 'text-green-600'}`}>{o.status}</span></td>
                     <td className={`p-4 text-right font-black font-mono ${o.isVoided ? 'text-slate-300 line-through' : 'text-slate-900'}`}>${o.total}</td>
@@ -1585,55 +1640,70 @@ export const DatabaseViewPage = () => {
                     <td className="p-4 text-right"><button onClick={(e) => { e.stopPropagation(); setViewJson(o); }} className="p-1.5 text-slate-300 hover:text-blue-500"><Code size={14} /></button></td>
                   </tr>
                   {expandedId === o.id && (
-                    <tr className="bg-blue-50/20"><td colSpan="9" className="p-0 border-b border-blue-100">
-                      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-2 duration-200">
-                        {/* 左側：商品清單 */}
-                        <div className="space-y-3">
-                          <h4 className="text-[10px] font-black text-blue-500 uppercase flex items-center gap-2 mb-2">
-                            <Receipt size={12} /> 訂單內容明細
-                          </h4>
-                          <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden shadow-sm">
-                            <table className="w-full text-[11px]">
-                              <thead className="bg-slate-50 border-b border-slate-100"><tr><th className="p-2 text-slate-400 font-bold">商品名稱</th><th className="p-2 text-right text-slate-400 font-bold">單價</th><th className="p-2 text-center text-slate-400 font-bold">數量</th><th className="p-2 text-right text-slate-400 font-bold">小計</th></tr></thead>
-                              <tbody className="divide-y divide-slate-5">{o.items?.map((item, idx) => (
-                                <tr key={idx} className="hover:bg-blue-50/10">
-                                  <td className="p-2 font-bold text-slate-600">
-                                    {item.name}
-                                    {/* 新增：顯示客製化標籤 */}
-                                    <div className="flex flex-wrap gap-1 mt-1">
-                                      {Object.values(item.selectedModules || {}).map((val, i) => (
-                                        <span key={i} className="text-[9px] text-slate-500 bg-slate-100 px-1 py-0.5 rounded font-bold border border-slate-200">
-                                          {val.name}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </td>
-                                  <td className="p-2 text-right text-slate-400 font-mono">${item.price}</td><td className="p-2 text-center font-bold text-slate-500 font-mono">x{item.quantity}</td><td className="p-2 text-right font-black text-slate-700 font-mono">${item.price * item.quantity}</td>
-                                </tr>))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                        {/* 右側：元數據摘要 */}
-                        <div className="space-y-4">
-                          <h4 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-2"><ListFilter size={12} /> 系統元數據 (Meta)</h4>
-                          <div className="grid grid-cols-2 gap-3 text-[10px]">
-                            <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1">內部唯一 ID</p><p className="font-mono text-slate-600">{o.id}</p></div>
-                            <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1">交易類型</p><p className="font-bold text-slate-600">{o.orderType === 'takeOut' ? '🥡 外帶' : '🍽️ 內用'}</p></div>
-
-                            {/* 新增：顯示金額摘要 (小計、折扣、總計) */}
-                            <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2">
-                              <p className="text-slate-400 font-bold mb-2 border-b border-slate-100 pb-1">財務摘要</p>
-                              <div className="flex justify-between mb-1"><span className="text-slate-500">小計</span><span className="font-mono">${o.total + (o.discount || 0)}</span></div>
-                              {o.discount > 0 && <div className="flex justify-between mb-1 text-red-500"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
-                              <div className="flex justify-between font-black text-slate-800 border-t border-slate-100 pt-1"><span>最終總額</span><span>${o.total}</span></div>
+                    <tr className="bg-blue-50/20">
+                      <td colSpan="9" className="p-0 border-b border-blue-100">
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-2 duration-200">
+                          {/* 左側：商品清單 */}
+                          <div className="space-y-3">
+                            <h4 className="text-[10px] font-black text-blue-500 uppercase flex items-center gap-2 mb-2">
+                              <Receipt size={12} /> 訂單內容明細
+                            </h4>
+                            <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden shadow-sm">
+                              <table className="w-full text-[11px]">
+                                <thead className="bg-slate-50 border-b border-slate-100">
+                                  <tr>
+                                    <th className="p-2 text-slate-400 font-bold">商品名稱</th>
+                                    <th className="p-2 text-right text-slate-400 font-bold">單價</th>
+                                    <th className="p-2 text-center text-slate-400 font-bold">數量</th>
+                                    <th className="p-2 text-right text-slate-400 font-bold">小計</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-5">
+                                  {o.items?.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-blue-50/10">
+                                      <td className="p-2 font-bold text-slate-600">
+                                        {item.name}
+                                        {/* 新增：顯示客製化標籤 */}
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {Object.values(item.selectedModules || {}).map((val, i) => (
+                                            <span key={i} className="text-[9px] text-slate-500 bg-slate-100 px-1 py-0.5 rounded font-bold border border-slate-200">
+                                              {val.name}
+                                              {val.price > 0 && ` +$${val.price}`}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </td>
+                                      <td className="p-2 text-right text-slate-400 font-mono">${item.price}</td>
+                                      <td className="p-2 text-center font-bold text-slate-500 font-mono">x{item.quantity}</td>
+                                      <td className="p-2 text-right font-black text-slate-700 font-mono">${item.price * item.quantity}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
+                          </div>
+                          {/* 右側：元數據摘要 */}
+                          <div className="space-y-4">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-2"><ListFilter size={12} /> 系統元數據 (Meta)</h4>
+                            <div className="grid grid-cols-2 gap-3 text-[10px]">
+                              {/* NEW: Full UUID Display */}
+                              <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1">內部唯一 ID (UUID)</p><p className="font-mono text-slate-600 break-all">{o.id}</p></div>
+                              <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1">交易類型</p><p className="font-bold text-slate-600">{o.orderType === 'takeOut' ? '🥡 外帶' : '🍽️ 內用'}</p></div>
 
-                            {o.isVoided && (<div className="bg-red-50 p-3 rounded-xl border border-red-100 col-span-2"><p className="text-red-400 font-bold mb-1 flex items-center gap-1"><AlertCircle size={10} /> 作廢原因</p><p className="font-bold text-red-700">{o.voidReason || '未註記'}</p></div>)}
+                              {/* 新增：顯示金額摘要 (小計、折扣、總計) */}
+                              <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2">
+                                <p className="text-slate-400 font-bold mb-2 border-b border-slate-100 pb-1">財務摘要</p>
+                                <div className="flex justify-between mb-1"><span className="text-slate-500">小計</span><span className="font-mono">${o.total + (o.discount || 0)}</span></div>
+                                {o.discount > 0 && <div className="flex justify-between mb-1 text-red-500"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
+                                <div className="flex justify-between font-black text-slate-800 border-t border-slate-100 pt-1"><span>最終總額</span><span>${o.total}</span></div>
+                              </div>
+
+                              {o.isVoided && (<div className="bg-red-50 p-3 rounded-xl border border-red-100 col-span-2"><p className="text-red-400 font-bold mb-1 flex items-center gap-1"><AlertCircle size={10} /> 作廢原因</p><p className="font-bold text-red-700">{o.voidReason || '未註記'}</p></div>)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td></tr>
+                      </td>
+                    </tr>
                   )}
                 </React.Fragment>
               ))}
