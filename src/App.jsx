@@ -317,7 +317,6 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
         setSelectedModules(initialData.selectedModules || {});
       } else {
         const defaults = {};
-        // 修正：不強制預設選取 Variant
         setSelectedModules(defaults);
       }
     }
@@ -484,7 +483,6 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
                 <div key={idx} className="flex justify-between text-sm text-slate-600 border-b border-slate-100 py-3 last:border-0">
                   <div className="flex flex-col max-w-[70%]">
                     <span className="font-bold text-slate-800 truncate">{item.name}</span>
-                    {/* 修正：只顯示選項名稱，不顯示模組名稱 */}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {Object.values(item.selectedModules || {}).map((val, i) => val ? (
                         <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
@@ -735,17 +733,13 @@ export const POSPage = () => {
       const c = orders.filter(o => o.date === orderDate && o.orderType === orderType).length;
       const orderNo = pref + (c + 1).toString().padStart(3, '0');
 
-      // NEW: Serial Number Generation (YYYYMMDD + 7 digit sequence)
-      const dateStr = orderDate.replace(/-/g, ''); // 2023-10-27 -> 20231027
-      // Count all orders for this date (regardless of type)
+      const dateStr = orderDate.replace(/-/g, '');
       const dailyCount = orders.filter(o => o.date === orderDate).length;
       const serialNo = `${dateStr}${(dailyCount + 1).toString().padStart(7, '0')}`;
 
-      // Fix: 使用 getCurrentTime 統一時間格式 (HH:mm:ss)
-      // Change id to UUID
       const newO = {
         id: crypto.randomUUID(),
-        serialNo, // Add serialNo
+        serialNo,
         orderNo,
         total: data.total ?? cart.reduce((s, i) => s + (i.price * i.quantity), 0),
         items: [...cart],
@@ -769,7 +763,6 @@ export const POSPage = () => {
     <div className="flex flex-col lg:flex-row gap-8 h-full overflow-hidden text-slate-900 font-sans">
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex justify-between items-center mb-6 shrink-0"><div className="flex items-center gap-4"><h2 className="text-2xl font-bold">點餐收銀</h2><div className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest">營業日: {shift.businessDate}</div></div><div className="relative w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="搜尋商品名稱..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none shadow-sm font-medium" /></div></div><div className="flex gap-2 mb-6 overflow-x-auto pb-2 shrink-0 no-scrollbar">{categories.map(c => (<button key={c} onClick={() => setSelectedCategory(c)} className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm border transition-all ${selectedCategory === c ? 'bg-blue-600 text-white shadow-md border-blue-600' : 'bg-white text-slate-500 border-slate-100 hover:border-blue-200'}`}>{c}</button>))}</div>
-        {/* UI Fix: gap-3, p-4, rounded-2xl, 移除標籤 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-2 flex-1 pb-10 content-start scrollbar-thin">
           {filtered.map(item => (
             <button key={item.id} onClick={() => { if (!item.isAvailable) return; handleAddToCart(item); }} className={`p-4 rounded-2xl shadow-sm border text-left group h-full min-h-[120px] flex flex-col justify-between relative overflow-hidden transition-all ${item.isAvailable ? 'bg-white border-slate-100 hover:border-blue-50' : 'bg-slate-50 opacity-60 grayscale'}`}>
@@ -777,7 +770,6 @@ export const POSPage = () => {
                 <div className="font-bold mb-1 truncate text-slate-800 text-base">{item.name}</div>
                 <div className="font-black text-xl text-blue-600 font-mono">${item.price}</div>
               </div>
-              {/* 移除客製化標籤 */}
               {!item.isAvailable && <div className="absolute inset-0 bg-slate-900/5 flex items-center justify-center"><span className="bg-slate-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest shadow-sm">暫不供應</span></div>}
             </button>
           ))}
@@ -785,12 +777,10 @@ export const POSPage = () => {
       </div>
 
       <div className="w-full lg:w-96 flex-shrink-0 bg-white rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-50 h-full overflow-hidden">
-        {/* Header - 縮減 padding */}
         <div className="p-5 border-b flex flex-col gap-3 bg-slate-50/50">
           <div className="flex justify-between items-center"><h3 className="font-bold text-lg text-slate-800">購物車</h3><span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-md">{cart.reduce((s, i) => s + i.quantity, 0)} 件</span></div>
           <div className="grid grid-cols-2 gap-2 bg-white p-1 rounded-xl border border-slate-100 shadow-inner font-bold"><button onClick={() => setOrderType('dineIn')} className={`flex items-center justify-center py-2 rounded-lg text-sm transition-all ${orderType === 'dineIn' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><Utensils size={14} className="mr-2" />內用</button><button onClick={() => setOrderType('takeOut')} className={`flex items-center justify-center py-2 rounded-lg text-sm transition-all ${orderType === 'takeOut' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}><ShoppingBag size={14} className="mr-2" />外帶</button></div>
         </div>
-        {/* List - 縮減 padding 與 spacing */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin">
           {cart.map(i => (
             <div key={i.cartId} onClick={() => handleEditCartItem(i)} className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm hover:border-blue-300 hover:ring-2 hover:ring-blue-50 cursor-pointer transition-all flex flex-col relative group">
@@ -820,7 +810,6 @@ export const POSPage = () => {
           ))}
           {cart.length === 0 && <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-60"><ShoppingCart size={48} className="mb-2 opacity-20" /><p className="text-xs font-medium">尚未點餐</p></div>}
         </div>
-        {/* Footer - 縮減 padding */}
         <div className="p-5 bg-slate-900 text-white rounded-b-[2.5rem]"><div className="flex justify-between items-center mb-4"><span className="text-slate-400 font-medium text-sm">應付總計</span><span className="text-3xl font-black tracking-tight font-mono">${cart.reduce((s, i) => s + (i.price * i.quantity), 0)}</span></div><button type="button" onClick={() => { if (cart.length > 0) { if (orderType === 'dineIn' && config?.dineInMode === 'postPay') finalizeOrder({ total: cart.reduce((s, i) => s + (i.price * i.quantity), 0) }); else setIsCheckoutModalOpen(true); } }} disabled={cart.length === 0} className={`w-full py-4 rounded-xl font-black text-lg active:scale-95 shadow-xl transition-all ${orderType === 'dineIn' && config?.dineInMode === 'postPay' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}>{orderType === 'dineIn' && config?.dineInMode === 'postPay' ? '送出訂單 (待付款)' : '進行結帳確認'}</button></div>
       </div>
 
@@ -836,7 +825,6 @@ export const OrderManagementPage = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [activePayOrder, setActivePayOrder] = useState(null);
   const [voidId, setVoidId] = useState(null);
-  // 新增：管理當前啟用的頁籤
   const [activeTab, setActiveTab] = useState('pending');
 
   const pending = orders.filter(o => o.status === 'unclosed' && o.paymentStatus === 'pending' && !o.isVoided);
@@ -856,7 +844,6 @@ export const OrderManagementPage = () => {
         </div>
       </div>
 
-      {/* 新增：頁籤切換區塊 */}
       <div className="bg-slate-100 p-1.5 rounded-2xl flex font-bold border border-slate-200 w-fit mb-6 shrink-0">
         <button onClick={() => setActiveTab('pending')} className={`px-6 py-2.5 rounded-xl text-sm transition-all flex items-center gap-2 ${activeTab === 'pending' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
           <AlertCircle size={16} /> 待收款區 <span className="bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full text-xs font-black">{pending.length}</span>
@@ -866,7 +853,6 @@ export const OrderManagementPage = () => {
         </button>
       </div>
 
-      {/* 將雙欄佈局改為單一列表佈局，根據頁籤條件渲染 */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-2 scrollbar-thin">
         {activeTab === 'pending' && (
           <div className="space-y-4 pb-10">
@@ -992,11 +978,9 @@ export const AdminPage = () => {
 
   const loadEditItem = (i) => {
     setEditId(i.id);
-    // Compatibility: 讀取時防呆
     setItem({ ...i, price: i.price.toString(), modules: i.modules || [] });
   };
 
-  // Fix: Admin Price Input - Handle conversion on submit
   const handleMenuSubmit = (e) => {
     e.preventDefault();
     if (!item.name || !item.category) return;
@@ -1030,26 +1014,22 @@ export const AdminPage = () => {
     setNewDisc({ name: '', type: 'percentage', value: '' });
   };
 
-  // 模組管理: 提交 (新增或更新)
   const handleTemplateSubmit = (e) => {
     e.preventDefault();
     if (!newTemplate.name || !newTemplate.optionsStr) return;
     const options = newTemplate.optionsStr.split(/[,，]/).map(s => s.trim()).filter(Boolean);
 
     if (editingTemplateId) {
-      // 更新模式
       setModifierTemplates(prev => prev.map(t =>
         t.id === editingTemplateId ? { ...t, name: newTemplate.name, options } : t
       ));
       setEditingTemplateId(null);
     } else {
-      // 新增模式
       setModifierTemplates([...modifierTemplates, { id: Date.now().toString(), name: newTemplate.name, options }]);
     }
     setNewTemplate({ name: '', optionsStr: '' });
   };
 
-  // 模組管理: 載入編輯
   const handleEditTemplate = (template) => {
     setNewTemplate({
       name: template.name,
@@ -1058,7 +1038,6 @@ export const AdminPage = () => {
     setEditingTemplateId(template.id);
   };
 
-  // 優惠管理: 載入編輯
   const handleEditDiscount = (discount) => {
     setNewDisc({
       name: discount.name,
@@ -1068,11 +1047,9 @@ export const AdminPage = () => {
     setEditingDiscountId(discount.id);
   };
 
-  // 商品編輯功能：加入模組
   const addModuleToItem = (templateId) => {
     const template = modifierTemplates.find(t => t.id === templateId);
     if (!template) return;
-    // 預設為 addon (加價)，選項價格預設 0
     const newModule = {
       id: Date.now().toString(),
       templateId: template.id,
@@ -1081,7 +1058,7 @@ export const AdminPage = () => {
       options: template.options.map(opt => ({ name: opt, price: 0 }))
     };
     setItem(prev => ({ ...prev, modules: [...prev.modules, newModule] }));
-    setShowModuleSelector(false); // 關閉下拉選單
+    setShowModuleSelector(false);
   };
 
   const removeModuleFromItem = (idx) => {
@@ -1091,19 +1068,15 @@ export const AdminPage = () => {
   const updateModuleType = (idx, type) => {
     const newModules = [...item.modules];
     newModules[idx].type = type;
-
-    // 若切換為 option (純選項)，將價格歸零
     if (type === 'option') {
       newModules[idx].options = newModules[idx].options.map(opt => ({ ...opt, price: 0 }));
     }
-
     setItem(prev => ({ ...prev, modules: newModules }));
   };
 
-  // Fix: 允許直接輸入字串，避免無法輸入小數點或清空
   const updateModuleOptionPrice = (moduleIdx, optionIdx, val) => {
     const newModules = [...item.modules];
-    newModules[moduleIdx].options[optionIdx].price = val; // Store as string temporarily
+    newModules[moduleIdx].options[optionIdx].price = val;
     setItem(prev => ({ ...prev, modules: newModules }));
   };
 
@@ -1120,7 +1093,6 @@ export const AdminPage = () => {
 
       {tab === 'menu' && (
         <div className="flex gap-6 h-full overflow-hidden">
-          {/* 左側列表 (還原) */}
           <div className="w-1/3 overflow-y-auto pr-2 scrollbar-thin space-y-3 pb-20">
             {menu.map((i) => (
               <div key={i.id} className={`bg-white p-4 rounded-2xl border flex flex-col gap-2 shadow-sm transition-all cursor-pointer ${editId === i.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-100 hover:border-blue-200'}`} onClick={() => loadEditItem(i)}>
@@ -1140,7 +1112,6 @@ export const AdminPage = () => {
             ))}
           </div>
 
-          {/* 右側表單 (還原) */}
           <form onSubmit={handleMenuSubmit} className="flex-1 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm overflow-y-auto scrollbar-thin pb-20">
             <h3 className="font-black text-xl mb-6 text-slate-800 border-b pb-4">{editId ? '編輯商品內容' : '新增商品'}</h3>
 
@@ -1150,7 +1121,6 @@ export const AdminPage = () => {
               <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">基礎價格</label><input type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-mono" value={item.price} onChange={e => setItem({ ...item, price: e.target.value })} /></div>
             </div>
 
-            {/* 模組套用區 */}
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="font-bold text-slate-700 flex items-center gap-2"><Layers size={18} /> 已套用客製模組</h4>
@@ -1158,7 +1128,6 @@ export const AdminPage = () => {
                   <button type="button" onClick={() => setShowModuleSelector(!showModuleSelector)} className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-100 flex items-center gap-1">
                     + 套用模組 {showModuleSelector ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
-                  {/* 修正：使用 State 控制顯示，避免 Hover 失效 */}
                   {showModuleSelector && (
                     <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-100 shadow-xl rounded-xl p-2 z-10 animate-in fade-in zoom-in-95">
                       {modifierTemplates.length > 0 ? modifierTemplates.map(t => (
@@ -1194,7 +1163,7 @@ export const AdminPage = () => {
                             <>
                               <span className="text-xs text-slate-400 font-bold">{mod.type === 'variant' ? '單價' : '加價'} $</span>
                               <input
-                                type="text" // Fix: 使用 text 允許小數點輸入
+                                type="text"
                                 className="w-16 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-right font-mono font-bold text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                                 value={opt.price}
                                 onChange={(e) => updateModuleOptionPrice(mIdx, oIdx, e.target.value)}
@@ -1223,7 +1192,6 @@ export const AdminPage = () => {
 
       {tab === 'modules' && (
         <div className="flex gap-6 h-full">
-          {/* 左側表單 (還原) */}
           <div className="w-1/3 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-fit">
             <h3 className="font-bold text-lg mb-4">{editingTemplateId ? '編輯模組' : '建立新模組'}</h3>
             <form onSubmit={handleTemplateSubmit} className="space-y-4">
@@ -1245,7 +1213,6 @@ export const AdminPage = () => {
               </div>
             </form>
           </div>
-          {/* 右側列表 (還原) */}
           <div className="flex-1 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm overflow-y-auto">
             <h3 className="font-black text-xl mb-6 text-slate-800">全域客製模組庫</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -1269,7 +1236,6 @@ export const AdminPage = () => {
 
       {tab === 'discount' && (
         <div className="h-full flex gap-6">
-          {/* 左側表單 (還原) */}
           <form onSubmit={handleDiscountSubmit} className="w-1/3 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-fit">
             <h3 className="font-bold text-lg mb-4">{editingDiscountId ? '編輯優惠' : '新增優惠'}</h3>
             <div className="space-y-4">
@@ -1288,7 +1254,6 @@ export const AdminPage = () => {
               </div>
             </div>
           </form>
-          {/* 右側列表 (還原) */}
           <div className="flex-1 overflow-y-auto space-y-3">
             {discountRules.map(r => (
               <div key={r.id} className={`bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm transition-all ${editingDiscountId === r.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-100'}`}>
@@ -1346,14 +1311,18 @@ export const SettlementPage = () => {
     const targetOrders = allOrders.filter(o => o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided));
     if (targetOrders.length === 0) return;
 
-    // 計算當日總結
-    const summary = targetOrders.reduce((acc, order) => {
+    // 關鍵修復：計算當日總結時，必須拿「當天『所有』已付款或作廢的訂單」，而非只有 targetOrders
+    const allDailyOrders = allOrders.filter(o => o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided));
+
+    // 計算當日總結 (改用 allDailyOrders，確保同日重複關帳不會遺失舊數據)
+    const summary = allDailyOrders.reduce((acc, order) => {
       if (order.isVoided) { acc.voidedCount += 1; }
       else {
         acc.total += order.total; acc.orderCount += 1; acc.typeCount[order.orderType || 'dineIn'] += 1;
         order.items?.forEach(item => { acc.itemSales[item.name] = (acc.itemSales[item.name] || 0) + (item.quantity || 1); });
       }
-      acc.relatedOrders.push(order);
+      // 確保彙總的訂單狀態都是 closed
+      acc.relatedOrders.push({ ...order, status: 'closed' });
       return acc;
     }, { total: 0, orderCount: 0, voidedCount: 0, itemSales: {}, typeCount: { dineIn: 0, takeOut: 0 }, relatedOrders: [] });
 
@@ -1361,10 +1330,13 @@ export const SettlementPage = () => {
       const updated = [...prev];
       const existingIdx = updated.findIndex(s => s.date === businessDate);
       if (existingIdx > -1) {
-        // 更新現有日報表
+        // 更新現有日報表：用最新的全日 summary 完整覆蓋
         const existing = { ...updated[existingIdx] };
         existing.total = summary.total;
         existing.orderCount = summary.orderCount;
+        existing.voidedCount = summary.voidedCount;
+        existing.itemSales = summary.itemSales;
+        existing.typeCount = summary.typeCount;
         existing.relatedOrders = summary.relatedOrders;
         updated[existingIdx] = existing;
       } else {
@@ -1374,7 +1346,7 @@ export const SettlementPage = () => {
       return updated;
     });
 
-    // 關鍵修正：將這些訂單標記為 'closed' (已結算)，讓 UI 標籤變色
+    // 將這些訂單標記為 'closed' (已結算)，讓 UI 標籤變色
     setOrders(prev => prev.map(o => (o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided)) ? { ...o, status: 'closed' } : o));
 
     // 注意：這裡不呼叫 setShift(isOpen: false)，所以班次保持開啟
@@ -1393,12 +1365,10 @@ export const SettlementPage = () => {
     <div key={idx} className="flex justify-between items-start py-2 border-b border-slate-100 last:border-0 font-sans">
       <div className="flex flex-col">
         <span className="text-slate-700 font-medium text-sm">{item.name}</span>
-        {/* 新增：顯示客製化標籤 */}
         <div className="flex flex-wrap gap-1 mt-1">
           {Object.values(item.selectedModules || {}).map((val, i) => (
             <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
               {val.name}
-              {/* 顯示選項價格 */}
               {val.price > 0 && ` +$${val.price}`}
             </span>
           ))}
@@ -1416,7 +1386,6 @@ export const SettlementPage = () => {
           <div><p className="opacity-70 text-sm font-bold uppercase tracking-widest mb-2 font-black">{shift.isOpen ? `營業日 ${shift.businessDate} 當前總額` : '休息結帳中 - SHIFT CLOSED'}</p><h3 className="text-5xl font-black tracking-tight font-mono">${totalRevenue}</h3></div>
           {shift.isOpen && (
             <div className="grid grid-cols-2 gap-3 mt-6">
-              {/* 修正：先行結算按鈕改呼叫 handlePreSettle */}
               <button onClick={() => handlePreSettle(shift.businessDate, orders)} className="bg-white/10 hover:bg-white/20 px-4 py-3.5 rounded-2xl font-bold border border-white/20 flex items-center justify-center gap-2 transition-all shadow-inner active:scale-95"><Coins size={18} /><span>先行結算</span></button>
               <button onClick={() => {
                 const unclosedOrders = orders.filter(o => o.status === 'unclosed');
@@ -1430,7 +1399,6 @@ export const SettlementPage = () => {
         <div className="bg-white p-10 rounded-3xl border border-slate-100 flex flex-col justify-center shadow-sm"><p className="text-sm font-bold uppercase tracking-widest mb-4 text-slate-400 font-black">當前班次支付分佈</p><div className="space-y-3 font-sans font-medium">{['Cash', 'Credit', 'Mobile'].map(pm => (<div key={pm} className="flex justify-between items-center text-sm font-medium"><span className="uppercase text-[10px] text-slate-400 font-black">{pm === 'Cash' ? '現金' : pm === 'Credit' ? '刷卡' : '支付'}</span><span className="font-black text-slate-700 font-mono">${currentShiftCompletedOrders.filter(o => o.paymentMethod === pm && !o.isVoided).reduce((s, o) => s + o.total, 0)}</span></div>))}</div></div>
       </div>
 
-      {/* 恢復統計區塊 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 shrink-0">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-[10px] font-black uppercase mb-4 text-slate-400 tracking-widest">銷量統計</h4><div className="space-y-2 max-h-32 overflow-y-auto scrollbar-thin">{Object.entries(stats.itemSales || {}).map(([name, count]) => (<div key={name} className="flex justify-between items-center text-sm font-medium"><span className="text-slate-600">{name}</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">{count}</span></div>))}</div></div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col"><h4 className="text-xs font-bold uppercase mb-4 flex items-center text-orange-500"><Utensils size={14} className="mr-2 text-orange-500" /> 內外帶</h4><div className="space-y-4"><div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-600">內用</span><span className="font-black text-blue-600">{stats.typeCount?.dineIn || 0}</span></div><div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-600">外帶</span><span className="font-black text-orange-600">{stats.typeCount?.takeOut || 0}</span></div></div></div>
@@ -1453,7 +1421,6 @@ export const SettlementPage = () => {
                       <span className={`ml-1 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
                         {order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}
                       </span>
-                      {/* UI Fix: 明確的結算狀態標籤 */}
                       {order.status === 'closed' ? (
                         <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-gray-200 text-gray-600">已結算</span>
                       ) : (
@@ -1471,7 +1438,6 @@ export const SettlementPage = () => {
                 {isOrderExpand && (
                   <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 animate-in fade-in">
                     <div className="space-y-2">{renderItemDetails(order.items)}</div>
-                    {/* 修正：加入優惠折抵顯示 */}
                     <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
                       <div className="flex justify-between text-xs text-slate-400"><span>小計</span><span>${order.total + (order.discount || 0)}</span></div>
                       {order.discount > 0 && <div className="flex justify-between text-xs text-red-400"><span>折扣 {order.discountName && `(${order.discountName})`}</span><span>-${order.discount}</span></div>}
@@ -1481,38 +1447,28 @@ export const SettlementPage = () => {
                 )}
               </div>
             );
-          })}
-        </div>
+          })}</div>
       </div>
     </div>
   );
 };
 
-// --- 11. DashboardPage (修正展開邏輯 + 新增日期搜尋) ---
+// --- 11. DashboardPage ---
 export const DashboardPage = () => {
   const { dailySummaries, orders, config } = useContext(POSContext);
-
-  // Tabs: 'daily' (日結報表), 'search' (單據查詢)
   const [dashTab, setDashTab] = useState('daily');
-
-  // State for 'daily' tab
   const [expandSummaryId, setExpandSummaryId] = useState(null);
   const [expandedOrderIds, setExpandedOrderIds] = useState(new Set());
   const [searchDate, setSearchDate] = useState('');
 
-  // 新增：報表分頁狀態
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10); // 改為 State 控制
-
-  // State for 'search' tab
+  const [pageSize, setPageSize] = useState(10);
   const [receiptSearch, setReceiptSearch] = useState('');
 
-  // 切換頁籤或搜尋日期時回到第一頁
   useEffect(() => {
     setCurrentPage(1);
   }, [searchDate, dashTab, pageSize]);
 
-  // 篩選日結報表邏輯
   const filteredSummaries = useMemo(() => {
     let data = [...dailySummaries];
     if (searchDate) {
@@ -1521,15 +1477,13 @@ export const DashboardPage = () => {
     return data.reverse();
   }, [dailySummaries, searchDate]);
 
-  // 新增：計算分頁
   const totalPages = Math.ceil(filteredSummaries.length / pageSize);
-  const safeCurrentPage = currentPage === '' ? 1 : currentPage; // 防止空字串導致的計算錯誤
+  const safeCurrentPage = currentPage === '' ? 1 : currentPage;
   const paginatedSummaries = useMemo(() => {
     const start = (safeCurrentPage - 1) * pageSize;
     return filteredSummaries.slice(start, start + pageSize);
   }, [filteredSummaries, safeCurrentPage, pageSize]);
 
-  // 搜尋單據邏輯
   const receiptSearchResults = useMemo(() => {
     if (!receiptSearch.trim()) return [];
     const s = receiptSearch.toLowerCase();
@@ -1553,7 +1507,6 @@ export const DashboardPage = () => {
     <div key={idx} className="flex justify-between items-start py-2 border-b border-slate-100 last:border-0 font-sans">
       <div className="flex flex-col">
         <span className="text-slate-700 font-medium text-sm">{item.name}</span>
-        {/* 新增：顯示客製化標籤 */}
         <div className="flex flex-wrap gap-1 mt-1">
           {Object.values(item.selectedModules || {}).map((val, i) => (
             <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
@@ -1581,7 +1534,6 @@ export const DashboardPage = () => {
         </div>
       </div>
 
-      {/* --- TAB: 日結報表 --- */}
       {dashTab === 'daily' && (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex justify-end items-center gap-3 mb-4 shrink-0">
@@ -1628,8 +1580,7 @@ export const DashboardPage = () => {
                                 <div onClick={(e) => { e.stopPropagation(); toggleOrderExpand(order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
                                   <div className="flex-col flex-1">
                                     <span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>
-                                      號碼 #{order.orderNo || 'N/A'}
-                                      {/* NEW: Serial No */}
+                                      #{order.orderNo || 'N/A'}
                                       <span className="text-[10px] font-normal text-slate-400 ml-2">SN: {order.serialNo || 'N/A'}</span>
                                     </span>
                                     <span className="text-[10px] text-slate-400 block mt-0.5">{order.time}</span>
@@ -1640,8 +1591,10 @@ export const DashboardPage = () => {
                                 </div>
                                 {isOrderExpand && (
                                   <div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in">
+                                    <div className="mb-4 p-3 bg-white border border-slate-100 rounded-xl text-[10px] text-slate-400 font-mono break-all">
+                                      <strong className="text-slate-600">UUID:</strong> {order.id}
+                                    </div>
                                     <div className="space-y-2">{renderItemDetails(order.items)}</div>
-                                    {/* 修正：加入優惠折抵顯示 */}
                                     <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
                                       <div className="flex justify-between text-xs text-slate-400"><span>小計</span><span>${order.total + (order.discount || 0)}</span></div>
                                       {order.discount > 0 && <div className="flex justify-between text-xs text-red-400"><span>折扣 {order.discountName && `(${order.discountName})`}</span><span>-${order.discount}</span></div>}
@@ -1661,14 +1614,12 @@ export const DashboardPage = () => {
               {filteredSummaries.length === 0 && <div className="text-center py-10 text-slate-400">查無此日期的報表資料</div>}
             </div>
 
-            {/* 新增：日結報表分頁控制 */}
             {filteredSummaries.length > 0 && (
               <div className="bg-white p-4 mt-4 border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 rounded-2xl shadow-sm shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="text-[11px] font-bold text-slate-400 uppercase">
                     顯示 {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, filteredSummaries.length)} 筆，共 {filteredSummaries.length} 筆
                   </div>
-                  {/* 切換每頁筆數 */}
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
@@ -1684,7 +1635,6 @@ export const DashboardPage = () => {
                   <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronsLeft size={16} /></button>
                   <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(prev => (prev === '' ? 1 : prev) - 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronLeft size={16} /></button>
 
-                  {/* 可編輯的當前頁碼輸入框 */}
                   <div className="flex items-center px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black justify-center">
                     <input
                       type="text"
@@ -1716,7 +1666,6 @@ export const DashboardPage = () => {
         </div>
       )}
 
-      {/* --- TAB: 單據查詢 (Receipt Search) --- */}
       {dashTab === 'search' && (
         <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50 rounded-3xl border border-slate-100 p-6 overflow-hidden">
           <div className="mb-6 shrink-0 relative">
@@ -1740,7 +1689,6 @@ export const DashboardPage = () => {
               <div className="w-full text-center py-20 text-slate-400">查無符合條件的單據</div>
             ) : (
               receiptSearchResults.map(order => (
-                /* Thermal Receipt Layout */
                 <div key={order.id} className="bg-white w-full max-w-sm shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] rounded border border-slate-200 relative overflow-hidden font-mono text-sm shrink-0 animate-in fade-in zoom-in-95">
                   {order.isVoided && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"><div className="border-4 border-red-500 text-red-500 text-5xl font-black rotate-[-30deg] opacity-30 p-2 rounded-xl">VOID</div></div>}
                   <div className="p-6">
@@ -1829,7 +1777,7 @@ export const DashboardPage = () => {
   );
 };
 
-// --- 12. DatabaseViewPage (修復結構與新增分頁下拉) ---
+// --- 12. DatabaseViewPage ---
 export const DatabaseViewPage = () => {
   const { orders, showAlert, setOrders } = useContext(POSContext);
   const [search, setSearch] = useState('');
@@ -1907,7 +1855,6 @@ export const DatabaseViewPage = () => {
                     <td className="p-4 text-center"><ChevronRight size={14} className={`text-slate-300 transition-transform ${expandedId === o.id ? 'rotate-90 text-blue-500' : ''}`} /></td>
                     <td className="p-4 font-bold text-slate-700">
                       <div>#{o.orderNo}</div>
-                      {/* NEW: Serial No */}
                       <div className="text-[9px] text-slate-400 font-mono mt-0.5">{o.serialNo || 'N/A'}</div>
                     </td>
                     <td className="p-4 text-slate-500 font-medium">{o.date} <span className="text-[10px] text-slate-300 ml-1">{o.time}</span></td>
@@ -1917,12 +1864,11 @@ export const DatabaseViewPage = () => {
                     <td className="p-4 text-center"><button onClick={(e) => { e.stopPropagation(); setEditingOrder(o); }} className="p-1.5 text-slate-400 hover:text-blue-600"><Edit2 size={14} /></button></td>
                     <td className="p-4 text-right"><button onClick={(e) => { e.stopPropagation(); setViewJson(o); }} className="p-1.5 text-slate-300 hover:text-blue-500"><Code size={14} /></button></td>
                   </tr>
-                  {/* Expanded Detail Row */}
+
                   {expandedId === o.id && (
                     <tr className="bg-blue-50/20">
                       <td colSpan="9" className="p-0 border-b border-blue-100">
                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-2 duration-200">
-                          {/* 左側：商品清單 */}
                           <div className="space-y-3">
                             <h4 className="text-[10px] font-black text-blue-500 uppercase flex items-center gap-2 mb-2">
                               <Receipt size={12} /> 訂單內容明細
@@ -1942,7 +1888,6 @@ export const DatabaseViewPage = () => {
                                     <tr key={idx} className="hover:bg-blue-50/10">
                                       <td className="p-2 font-bold text-slate-600">
                                         {item.name}
-                                        {/* 新增：顯示客製化標籤 */}
                                         <div className="flex flex-wrap gap-1 mt-1">
                                           {Object.values(item.selectedModules || {}).map((val, i) => (
                                             <span key={i} className="text-[9px] text-slate-500 bg-slate-100 px-1 py-0.5 rounded font-bold border border-slate-200">
@@ -1962,16 +1907,13 @@ export const DatabaseViewPage = () => {
                             </div>
                           </div>
 
-                          {/* 右側：元數據摘要 */}
                           <div className="space-y-4">
                             <h4 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-2"><ListFilter size={12} /> 系統元數據 (Meta)</h4>
                             <div className="grid grid-cols-2 gap-3 text-[10px]">
-                              {/* 顯示 UUID 與 SN */}
                               <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2"><p className="text-slate-400 font-bold mb-1">內部唯一 ID (UUID)</p><p className="font-mono text-slate-600 break-all">{o.id}</p></div>
                               <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1 flex items-center gap-1"><Hash size={10} /> 序號 (SN)</p><p className="font-mono text-slate-800 text-sm">{o.serialNo || 'N/A'}</p></div>
                               <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1 flex items-center gap-1"><Fingerprint size={10} /> 訂單編號</p><p className="font-bold text-slate-800 text-sm">#{o.orderNo}</p></div>
 
-                              {/* 顯示金額摘要 */}
                               <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2">
                                 <p className="text-slate-400 font-bold mb-2 border-b border-slate-100 pb-1">財務摘要</p>
                                 <div className="flex justify-between mb-1"><span className="text-slate-500">小計</span><span className="font-mono">${o.total + (o.discount || 0)}</span></div>
@@ -1979,7 +1921,6 @@ export const DatabaseViewPage = () => {
                                 <div className="flex justify-between font-black text-slate-800 border-t border-slate-100 pt-1"><span>最終總額</span><span>${o.total}</span></div>
                               </div>
 
-                              {/* 保留作廢原因以供查閱 */}
                               {o.isVoided && (
                                 <div className="bg-red-50 p-3 rounded-xl border border-red-100 col-span-2">
                                   <p className="text-red-400 font-bold mb-1 flex items-center gap-1"><AlertCircle size={10} /> 作廢原因</p>
@@ -2001,13 +1942,11 @@ export const DatabaseViewPage = () => {
           )}
         </div>
 
-        {/* 分頁控制 */}
         <div className="bg-slate-50 p-4 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0 rounded-b-3xl">
           <div className="flex items-center gap-4">
             <div className="text-[11px] font-bold text-slate-400 uppercase">
               顯示 {filteredOrders.length > 0 ? (safeCurrentPage - 1) * pageSize + 1 : 0} - {Math.min(safeCurrentPage * pageSize, filteredOrders.length)} 筆，共 {filteredOrders.length} 筆
             </div>
-            {/* 新增：切換每頁筆數 */}
             <select
               value={pageSize}
               onChange={(e) => setPageSize(Number(e.target.value))}
@@ -2023,7 +1962,6 @@ export const DatabaseViewPage = () => {
             <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronsLeft size={16} /></button>
             <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(prev => (prev === '' ? 1 : prev) - 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronLeft size={16} /></button>
 
-            {/* 可編輯的當前頁碼輸入框 */}
             <div className="flex items-center px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black justify-center">
               <input
                 type="text"
@@ -2052,7 +1990,6 @@ export const DatabaseViewPage = () => {
         </div>
       </div>
 
-      {/* 檢視 JSON */}
       {viewJson && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in font-sans text-slate-900">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
@@ -2062,7 +1999,6 @@ export const DatabaseViewPage = () => {
         </div>
       )}
 
-      {/* 編輯訂單 */}
       {editingOrder && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
@@ -2168,6 +2104,11 @@ export const SettingsPage = () => {
           </div>
         </section>
       </div>
+      {isEdit && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t flex justify-center lg:hidden">
+          <button onClick={handleSave} className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg">儲存設定</button>
+        </div>
+      )}
     </div>
   );
 };
