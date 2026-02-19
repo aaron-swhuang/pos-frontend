@@ -484,6 +484,7 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
                 <div key={idx} className="flex justify-between text-sm text-slate-600 border-b border-slate-100 py-3 last:border-0">
                   <div className="flex flex-col max-w-[70%]">
                     <span className="font-bold text-slate-800 truncate">{item.name}</span>
+                    {/* 修正：只顯示選項名稱，不顯示模組名稱 */}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {Object.values(item.selectedModules || {}).map((val, i) => val ? (
                         <span key={i} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
@@ -583,7 +584,7 @@ export const CheckoutModal = ({ isOpen, onClose, cartTotal, items, onConfirm }) 
   );
 };
 
-// --- 4. VoidReasonModal (移到 OrderManagementPage 之前) ---
+// --- 4. VoidReasonModal ---
 export const VoidReasonModal = ({ isOpen, onClose, onConfirm }) => {
   const [reason, setReason] = useState('');
   if (!isOpen) return null;
@@ -669,7 +670,7 @@ export const Sidebar = () => {
       </div>
       <div className="px-6 py-4"><div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${shift.isOpen ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}><div className={`w-2 h-2 rounded-full animate-pulse ${shift.isOpen ? 'bg-green-400' : 'bg-red-400'}`} /><span className="text-xs font-black uppercase tracking-wider">{shift.isOpen ? '營業中' : '休息中'}</span></div></div>
       <div className="flex-1 px-4 space-y-2 mt-2 overflow-y-auto scrollbar-hide">{navItems.map(item => (<Link key={item.path} to={item.path} className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${location.pathname === item.path ? 'bg-blue-600 text-white shadow-lg font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><item.icon size={20} /><span className="font-medium">{item.label}</span></Link>))}</div>
-      <button onClick={() => showConfirm('安全登出', '確定要登出系統嗎？', () => setIsLoggedIn(false))} className="m-6 p-4 flex items-center space-x-3 text-slate-500 hover:text-red-400 border-t border-slate-800 font-bold transition-colors shrink-0">
+      <button onClick={() => showConfirm('安全登出', '確定要登出？', () => setIsLoggedIn(false))} className="m-6 p-4 flex items-center space-x-3 text-slate-500 hover:text-red-400 border-t border-slate-800 font-bold transition-colors shrink-0">
         <LogOut size={20} /><span>安全登出</span>
       </button>
     </div>
@@ -835,64 +836,139 @@ export const OrderManagementPage = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [activePayOrder, setActivePayOrder] = useState(null);
   const [voidId, setVoidId] = useState(null);
+  // 新增：管理當前啟用的頁籤
+  const [activeTab, setActiveTab] = useState('pending');
+
   const pending = orders.filter(o => o.status === 'unclosed' && o.paymentStatus === 'pending' && !o.isVoided);
   const history = orders.filter(o => o.status === 'unclosed' && (o.paymentStatus === 'paid' || o.isVoided));
   const handleActionClick = (actionFn) => { if (!shift.isOpen) { showAlert('操作鎖定', '目前班次已結清休息中，無法修改。', 'danger'); return; } actionFn(); };
-  return (<div className="max-w-6xl h-full flex flex-col overflow-hidden text-slate-900 font-sans"><div className="flex justify-between items-end mb-8 shrink-0"><div><h2 className="text-3xl font-black text-slate-800 uppercase">訂單管理</h2><p className="text-slate-400 mt-1 flex items-center gap-2 font-medium">目前未日結交易清單 {!shift.isOpen && <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-black">班次鎖定</span>}</p></div><div className="flex gap-4 font-bold"><div className="bg-amber-50 px-8 py-4 rounded-3xl text-right border border-amber-100 text-amber-700 shadow-sm"><p className="text-[10px] uppercase font-black text-amber-500">待收</p><p className="text-2xl font-black font-mono">${pending.reduce((s, o) => s + o.total, 0)}</p></div><div className="bg-blue-50 px-8 py-4 rounded-3xl text-right border border-blue-100 text-blue-700 shadow-sm"><p className="text-[10px] uppercase font-black text-blue-500">實收</p><p className="text-2xl font-black font-mono">${history.filter(o => !o.isVoided).reduce((s, o) => s + o.total, 0)}</p></div></div></div><div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-10 overflow-hidden"><div className="flex flex-col min-h-0"><h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2 tracking-widest"><AlertCircle size={16} className="text-amber-500" /> 待收款區 ({pending.length})</h3><div className="flex-1 overflow-y-auto space-y-4 pb-10 pr-2 scrollbar-thin">{pending.map(o => (
-    <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-6 rounded-[2rem] border transition-all cursor-pointer ${expandedId === o.id ? 'ring-2 ring-blue-500 shadow-xl' : 'border-slate-100 hover:border-blue-200'}`}><div className="flex justify-between items-center"><div><div className="flex items-center gap-2 mb-1.5 font-black text-xl text-slate-800">#{o.orderNo} <span className="text-xs text-slate-400 font-medium">SN: {o.serialNo || 'N/A'}</span> <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-black">待付款</span></div><div className="text-xs text-slate-400 flex items-center gap-1 font-mono tracking-tight"><Clock size={12} />{o.date} {o.time}</div></div><div className="flex items-center gap-4"><button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={20} /></button><div className="text-right mx-2 font-sans"><p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">金額</p><p className="text-2xl font-black text-slate-800 font-mono">${o.total}</p></div><button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setActivePayOrder(o)); }} className={`bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-lg hover:bg-blue-600 transition-all text-sm uppercase ${!shift.isOpen ? 'opacity-30' : ''}`}>前往付款 PAY</button></div></div>
-      {expandedId === o.id && (
-        <div className="mt-6 pt-5 border-t border-slate-100">
-          <div className="space-y-2 mb-4">
-            {(o.items || []).map((it, idx) => (
-              <div key={idx} className="flex justify-between text-sm text-slate-600 font-medium font-sans">
-                <div className="flex flex-col">
-                  <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {Object.values(it.selectedModules || {}).map((m, i) => (<span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-500">{m.name}</span>))}
+
+  return (
+    <div className="max-w-6xl h-full flex flex-col overflow-hidden text-slate-900 font-sans">
+      <div className="flex justify-between items-end mb-8 shrink-0">
+        <div>
+          <h2 className="text-3xl font-black text-slate-800 uppercase">訂單管理</h2>
+          <p className="text-slate-400 mt-1 flex items-center gap-2 font-medium">目前未日結交易清單 {!shift.isOpen && <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-black">班次鎖定</span>}</p>
+        </div>
+        <div className="flex gap-4 font-bold">
+          <div className="bg-amber-50 px-8 py-4 rounded-3xl text-right border border-amber-100 text-amber-700 shadow-sm"><p className="text-[10px] uppercase font-black text-amber-500">待收</p><p className="text-2xl font-black font-mono">${pending.reduce((s, o) => s + o.total, 0)}</p></div>
+          <div className="bg-blue-50 px-8 py-4 rounded-3xl text-right border border-blue-100 text-blue-700 shadow-sm"><p className="text-[10px] uppercase font-black text-blue-500">實收</p><p className="text-2xl font-black font-mono">${history.filter(o => !o.isVoided).reduce((s, o) => s + o.total, 0)}</p></div>
+        </div>
+      </div>
+
+      {/* 新增：頁籤切換區塊 */}
+      <div className="bg-slate-100 p-1.5 rounded-2xl flex font-bold border border-slate-200 w-fit mb-6 shrink-0">
+        <button onClick={() => setActiveTab('pending')} className={`px-6 py-2.5 rounded-xl text-sm transition-all flex items-center gap-2 ${activeTab === 'pending' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
+          <AlertCircle size={16} /> 待收款區 <span className="bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full text-xs font-black">{pending.length}</span>
+        </button>
+        <button onClick={() => setActiveTab('completed')} className={`px-6 py-2.5 rounded-xl text-sm transition-all flex items-center gap-2 ${activeTab === 'completed' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
+          <CheckCircle2 size={16} /> 已付清 / 已作廢 <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-xs font-black">{history.length}</span>
+        </button>
+      </div>
+
+      {/* 將雙欄佈局改為單一列表佈局，根據頁籤條件渲染 */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-2 scrollbar-thin">
+        {activeTab === 'pending' && (
+          <div className="space-y-4 pb-10">
+            {pending.map(o => (
+              <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-6 rounded-[2rem] border transition-all cursor-pointer ${expandedId === o.id ? 'ring-2 ring-blue-500 shadow-xl' : 'border-slate-100 hover:border-blue-200'}`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5 font-black text-xl text-slate-800">
+                      #{o.orderNo}
+                      <span className="text-xs text-slate-400 font-medium">SN: {o.serialNo || 'N/A'}</span>
+                      <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-black">待付款</span>
+                    </div>
+                    <div className="text-xs text-slate-400 flex items-center gap-1 font-mono tracking-tight"><Clock size={12} />{o.date} {o.time}</div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={20} /></button>
+                    <div className="text-right mx-2 font-sans"><p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">金額</p><p className="text-2xl font-black text-slate-800 font-mono">${o.total}</p></div>
+                    <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setActivePayOrder(o)); }} className={`bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-lg hover:bg-blue-600 transition-all text-sm uppercase ${!shift.isOpen ? 'opacity-30' : ''}`}>前往付款 PAY</button>
                   </div>
                 </div>
-                <span className="font-bold text-slate-800 font-mono">${it.price * it.quantity}</span>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-slate-100 pt-4 space-y-1">
-            <div className="flex justify-between text-xs text-slate-400"><span>小計</span><span>${o.total + (o.discount || 0)}</span></div>
-            {o.discount > 0 && <div className="flex justify-between text-xs text-red-400"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
-            <div className="flex justify-between font-black text-slate-800 text-base"><span>總計</span><span>${o.total}</span></div>
-          </div>
-        </div>
-      )}
-    </div>))}</div></div><div className="flex flex-col min-h-0"><h3 className="text-xs font-black text-slate-400 uppercase mb-5 flex items-center gap-2 px-2 tracking-widest"><CheckCircle2 size={16} className="text-blue-500" /> 已付清 / 已作廢 (未結算)</h3><div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">{[...history].reverse().map(o => (
-      <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-5 rounded-[1.5rem] border border-slate-100 transition-all cursor-pointer ${o.isVoided ? 'opacity-40 grayscale bg-slate-50 border-dashed' : 'hover:bg-blue-50/30'}`}><div className="flex justify-between items-center"><div className="flex items-center gap-4"><div className={`p-2 rounded-xl ${o.isVoided ? 'bg-slate-200 text-slate-400' : 'bg-blue-50 text-blue-500'}`}>{o.orderType === 'takeOut' ? <ShoppingBag size={22} /> : <Utensils size={22} />}</div><div><div className={`font-black text-base text-slate-800 flex items-center gap-2 ${o.isVoided ? 'line-through opacity-50' : ''}`}>#{o.orderNo} <span className="text-[10px] text-slate-400 font-medium normal-case">SN: {o.serialNo || 'N/A'}</span></div><div className="text-[10px] text-slate-400 font-mono tracking-tight">{o.date} {o.time}</div></div></div><div className="flex items-center gap-5">{!o.isVoided && <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={18} /></button>}<div className="text-right font-sans"><div className={`text-xl font-black font-mono font-mono font-mono ${o.isVoided ? 'text-slate-400' : 'text-slate-800'}`}>${o.total}</div><div className={`text-[10px] font-black uppercase tracking-widest ${o.isVoided ? 'text-red-500' : 'text-blue-400'}`}>{o.isVoided ? 'VOID' : (o.paymentMethod || 'PAID')}</div></div></div></div>
-        {expandedId === o.id && (
-          <div className="mt-5 pt-4 border-t border-slate-100 text-[10px] space-y-2 font-sans">
-            {o.isVoided && <div className="bg-red-50 p-2.5 rounded-xl text-red-600 font-bold border border-red-100 flex items-center gap-2 uppercase tracking-wide"><AlertTriangle size={12} />Reason: {o.voidReason}</div>}
-            <div className="space-y-2 mb-4">
-              {(o.items || []).map((it, idx) => (
-                <div key={idx} className="flex justify-between px-1 text-slate-600 font-medium">
-                  <div className="flex flex-col">
-                    <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {Object.values(it.selectedModules || {}).map((m, i) => (<span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-500">{m.name}</span>))}
+                {expandedId === o.id && (
+                  <div className="mt-6 pt-5 border-t border-slate-100">
+                    <div className="space-y-2 mb-4">
+                      {(o.items || []).map((it, idx) => (
+                        <div key={idx} className="flex justify-between text-sm text-slate-600 font-medium font-sans">
+                          <div className="flex flex-col">
+                            <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Object.values(it.selectedModules || {}).map((m, i) => (<span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-500">{m.name}</span>))}
+                            </div>
+                          </div>
+                          <span className="font-bold text-slate-800 font-mono">${it.price * it.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-slate-100 pt-4 space-y-1">
+                      <div className="flex justify-between text-xs text-slate-400"><span>小計</span><span>${o.total + (o.discount || 0)}</span></div>
+                      {o.discount > 0 && <div className="flex justify-between text-xs text-red-400"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
+                      <div className="flex justify-between font-black text-slate-800 text-base"><span>總計</span><span>${o.total}</span></div>
                     </div>
                   </div>
-                  <span className="font-bold text-slate-900 font-mono">${it.price * it.quantity}</span>
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-slate-100 pt-2 space-y-1">
-              <div className="flex justify-between text-slate-400"><span>小計</span><span>${o.total + (o.discount || 0)}</span></div>
-              {o.discount > 0 && <div className="flex justify-between text-red-400"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
-              <div className="flex justify-between font-black text-slate-800 text-sm mt-1"><span>總計</span><span>${o.total}</span></div>
-            </div>
-            {/* NEW: Serial No and UUID */}
-            <div className="mt-3 pt-2 border-t border-slate-100 text-[9px] text-slate-400 font-mono flex flex-col gap-1">
-              <div>SN: {o.serialNo || 'N/A'}</div>
-              <div>UUID: {o.id}</div>
-            </div>
+                )}
+              </div>
+            ))}
+            {pending.length === 0 && <div className="text-center py-20 text-slate-400 font-medium border-2 border-dashed border-slate-200 rounded-3xl">目前沒有待收款的訂單</div>}
           </div>
         )}
-      </div>))}</div></div></div><CheckoutModal isOpen={!!activePayOrder} onClose={() => setActivePayOrder(null)} cartTotal={activePayOrder?.total || 0} items={activePayOrder?.items || []} onConfirm={(d) => { setOrders(prev => prev.map(o => o.id === activePayOrder.id ? { ...o, ...d, paymentStatus: 'paid', status: 'unclosed' } : o)); setActivePayOrder(null); }} /><VoidReasonModal isOpen={!!voidId} onClose={() => setVoidId(null)} onConfirm={(r) => { setOrders(prev => prev.map(o => o.id === voidId ? { ...o, isVoided: true, voidReason: r } : o)); setVoidId(null); }} /></div>);
+
+        {activeTab === 'completed' && (
+          <div className="space-y-3 pb-10">
+            {[...history].reverse().map(o => (
+              <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-5 rounded-[1.5rem] border border-slate-100 transition-all cursor-pointer ${o.isVoided ? 'opacity-40 grayscale bg-slate-50 border-dashed' : 'hover:bg-blue-50/30'}`}>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-2 rounded-xl ${o.isVoided ? 'bg-slate-200 text-slate-400' : 'bg-blue-50 text-blue-500'}`}>{o.orderType === 'takeOut' ? <ShoppingBag size={22} /> : <Utensils size={22} />}</div>
+                    <div>
+                      <div className={`font-black text-base text-slate-800 flex items-center gap-2 ${o.isVoided ? 'line-through opacity-50' : ''}`}>#{o.orderNo} <span className="text-[10px] text-slate-400 font-medium normal-case">SN: {o.serialNo || 'N/A'}</span></div>
+                      <div className="text-[10px] text-slate-400 font-mono tracking-tight">{o.date} {o.time}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-5">
+                    {!o.isVoided && <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={18} /></button>}
+                    <div className="text-right font-sans">
+                      <div className={`text-xl font-black font-mono font-mono font-mono ${o.isVoided ? 'text-slate-400' : 'text-slate-800'}`}>${o.total}</div>
+                      <div className={`text-[10px] font-black uppercase tracking-widest ${o.isVoided ? 'text-red-500' : 'text-blue-400'}`}>{o.isVoided ? 'VOID' : (o.paymentMethod || 'PAID')}</div>
+                    </div>
+                  </div>
+                </div>
+                {expandedId === o.id && (
+                  <div className="mt-5 pt-4 border-t border-slate-100 text-[10px] space-y-2 font-sans">
+                    {o.isVoided && <div className="bg-red-50 p-2.5 rounded-xl text-red-600 font-bold border border-red-100 flex items-center gap-2 uppercase tracking-wide"><AlertTriangle size={12} />Reason: {o.voidReason}</div>}
+                    <div className="space-y-2 mb-4">
+                      {(o.items || []).map((it, idx) => (
+                        <div key={idx} className="flex justify-between px-1 text-slate-600 font-medium">
+                          <div className="flex flex-col">
+                            <span>{it.name} <span className="font-bold text-slate-400">x {it.quantity}</span></span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Object.values(it.selectedModules || {}).map((m, i) => (<span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-500">{m.name}</span>))}
+                            </div>
+                          </div>
+                          <span className="font-bold text-slate-900 font-mono">${it.price * it.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-slate-100 pt-2 space-y-1">
+                      <div className="flex justify-between text-slate-400"><span>小計</span><span>${o.total + (o.discount || 0)}</span></div>
+                      {o.discount > 0 && <div className="flex justify-between text-red-400"><span>折扣 {o.discountName && `(${o.discountName})`}</span><span>-${o.discount}</span></div>}
+                      <div className="flex justify-between font-black text-slate-800 text-sm mt-1"><span>總計</span><span>${o.total}</span></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {history.length === 0 && <div className="text-center py-20 text-slate-400 font-medium border-2 border-dashed border-slate-200 rounded-3xl">目前沒有已處理的訂單</div>}
+          </div>
+        )}
+      </div>
+
+      <CheckoutModal isOpen={!!activePayOrder} onClose={() => setActivePayOrder(null)} cartTotal={activePayOrder?.total || 0} items={activePayOrder?.items || []} onConfirm={(d) => { setOrders(prev => prev.map(o => o.id === activePayOrder.id ? { ...o, ...d, paymentStatus: 'paid', status: 'unclosed' } : o)); setActivePayOrder(null); }} />
+      <VoidReasonModal isOpen={!!voidId} onClose={() => setVoidId(null)} onConfirm={(r) => { setOrders(prev => prev.map(o => o.id === voidId ? { ...o, isVoided: true, voidReason: r } : o)); setVoidId(null); }} />
+    </div>
+  );
 };
 
 // --- 9. AdminPage ---
@@ -1405,13 +1481,14 @@ export const SettlementPage = () => {
                 )}
               </div>
             );
-          })}</div>
+          })}
+        </div>
       </div>
     </div>
   );
 };
 
-// --- 11. DashboardPage (含日結報表與單據查詢) ---
+// --- 11. DashboardPage (修正展開邏輯 + 新增日期搜尋) ---
 export const DashboardPage = () => {
   const { dailySummaries, orders, config } = useContext(POSContext);
 
@@ -1423,8 +1500,17 @@ export const DashboardPage = () => {
   const [expandedOrderIds, setExpandedOrderIds] = useState(new Set());
   const [searchDate, setSearchDate] = useState('');
 
+  // 新增：報表分頁狀態
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10); // 改為 State 控制
+
   // State for 'search' tab
   const [receiptSearch, setReceiptSearch] = useState('');
+
+  // 切換頁籤或搜尋日期時回到第一頁
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchDate, dashTab, pageSize]);
 
   // 篩選日結報表邏輯
   const filteredSummaries = useMemo(() => {
@@ -1434,6 +1520,14 @@ export const DashboardPage = () => {
     }
     return data.reverse();
   }, [dailySummaries, searchDate]);
+
+  // 新增：計算分頁
+  const totalPages = Math.ceil(filteredSummaries.length / pageSize);
+  const safeCurrentPage = currentPage === '' ? 1 : currentPage; // 防止空字串導致的計算錯誤
+  const paginatedSummaries = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredSummaries.slice(start, start + pageSize);
+  }, [filteredSummaries, safeCurrentPage, pageSize]);
 
   // 搜尋單據邏輯
   const receiptSearchResults = useMemo(() => {
@@ -1513,7 +1607,7 @@ export const DashboardPage = () => {
 
           <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-thin">
             <div className="space-y-4">
-              {filteredSummaries.map((summary, index) => (
+              {paginatedSummaries.map((summary, index) => (
                 <div key={`${summary.id}-${index}`} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-all">
                   <div onClick={() => setExpandSummaryId(expandSummaryId === summary.id ? null : summary.id)} className={`p-6 flex items-center justify-between cursor-pointer ${expandSummaryId === summary.id ? 'bg-blue-50/50' : ''}`}><div className="flex items-center space-x-4"><div className="bg-green-100 text-green-600 p-3 rounded-xl shadow-sm"><FileText /></div><div><div className="font-bold text-lg text-slate-800 tracking-tight">{summary.date} 彙整報表</div><div className="text-xs text-slate-400 font-medium font-mono opacity-60">最後結算：{summary.closedAt}</div></div></div><div className="flex items-center space-x-8"><div className="text-right"><div className="text-xs uppercase font-black text-slate-400 tracking-tighter">總金額</div><div className="text-2xl font-black text-blue-600 tracking-tight font-mono font-mono">${summary.total}</div></div>{expandSummaryId === summary.id ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}</div></div>
                   {expandSummaryId === summary.id && (
@@ -1533,9 +1627,10 @@ export const DashboardPage = () => {
                               <div key={order.id} className={`bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm ${order.isVoided ? 'opacity-40 grayscale' : ''}`}>
                                 <div onClick={(e) => { e.stopPropagation(); toggleOrderExpand(order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
                                   <div className="flex-col flex-1">
-                                    <span className={`text-sm font-bold flex items-center gap-2 ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>
-                                      #{order.orderNo || 'N/A'}
-                                      <span className="text-[10px] font-medium text-slate-400 normal-case">SN: {order.serialNo || 'N/A'}</span>
+                                    <span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>
+                                      號碼 #{order.orderNo || 'N/A'}
+                                      {/* NEW: Serial No */}
+                                      <span className="text-[10px] font-normal text-slate-400 ml-2">SN: {order.serialNo || 'N/A'}</span>
                                     </span>
                                     <span className="text-[10px] text-slate-400 block mt-0.5">{order.time}</span>
                                   </div>
@@ -1545,10 +1640,6 @@ export const DashboardPage = () => {
                                 </div>
                                 {isOrderExpand && (
                                   <div className="px-10 py-4 bg-slate-50 border-t border-slate-100 animate-in fade-in">
-                                    {/* UUID Display */}
-                                    <div className="mb-4 p-3 bg-white border border-slate-100 rounded-xl text-[10px] text-slate-400 font-mono break-all">
-                                      <strong className="text-slate-600">UUID:</strong> {order.id}
-                                    </div>
                                     <div className="space-y-2">{renderItemDetails(order.items)}</div>
                                     {/* 修正：加入優惠折抵顯示 */}
                                     <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
@@ -1569,6 +1660,58 @@ export const DashboardPage = () => {
               ))}
               {filteredSummaries.length === 0 && <div className="text-center py-10 text-slate-400">查無此日期的報表資料</div>}
             </div>
+
+            {/* 新增：日結報表分頁控制 */}
+            {filteredSummaries.length > 0 && (
+              <div className="bg-white p-4 mt-4 border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 rounded-2xl shadow-sm shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="text-[11px] font-bold text-slate-400 uppercase">
+                    顯示 {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, filteredSummaries.length)} 筆，共 {filteredSummaries.length} 筆
+                  </div>
+                  {/* 切換每頁筆數 */}
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-600 font-bold bg-white cursor-pointer hover:bg-slate-50 transition-colors"
+                  >
+                    <option value={10}>10 筆 / 頁</option>
+                    <option value={25}>25 筆 / 頁</option>
+                    <option value={50}>50 筆 / 頁</option>
+                    <option value={100}>100 筆 / 頁</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronsLeft size={16} /></button>
+                  <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(prev => (prev === '' ? 1 : prev) - 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronLeft size={16} /></button>
+
+                  {/* 可編輯的當前頁碼輸入框 */}
+                  <div className="flex items-center px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black justify-center">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={currentPage}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val === '') setCurrentPage('');
+                        else {
+                          let p = parseInt(val, 10);
+                          if (totalPages > 0 && p > totalPages) p = totalPages;
+                          if (p < 1) p = 1;
+                          setCurrentPage(p);
+                        }
+                      }}
+                      onBlur={() => { if (currentPage === '' || currentPage < 1) setCurrentPage(1); }}
+                      className="w-8 text-center text-blue-600 font-mono outline-none bg-slate-50 rounded px-1 py-0.5"
+                    />
+                    <span className="mx-2 text-slate-300">/</span><span className="text-slate-500 font-mono pr-2">{totalPages || 1}</span>
+                  </div>
+
+                  <button disabled={safeCurrentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => (prev === '' ? 1 : prev) + 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronRight size={16} /></button>
+                  <button disabled={safeCurrentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(totalPages)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronsRight size={16} /></button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1686,7 +1829,7 @@ export const DashboardPage = () => {
   );
 };
 
-// --- 12. DatabaseViewPage (修復結構與欄位) ---
+// --- 12. DatabaseViewPage (修復結構與新增分頁下拉) ---
 export const DatabaseViewPage = () => {
   const { orders, showAlert, setOrders } = useContext(POSContext);
   const [search, setSearch] = useState('');
@@ -1712,10 +1855,11 @@ export const DatabaseViewPage = () => {
   }, [orders, search]);
 
   const totalPages = Math.ceil(filteredOrders.length / pageSize);
+  const safeCurrentPage = currentPage === '' ? 1 : currentPage; // 防止空字串導致的計算錯誤
   const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredOrders.slice(start, start + pageSize);
-  }, [filteredOrders, currentPage, pageSize]);
+  }, [filteredOrders, safeCurrentPage, pageSize]);
 
   const copyToClipboard = (text) => {
     const el = document.createElement('textarea');
@@ -1747,8 +1891,7 @@ export const DatabaseViewPage = () => {
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10 shadow-sm">
               <tr>
                 <th className="p-4 w-12 text-center">#</th>
-                <th className="p-4">SN</th>
-                <th className="p-4">Order No.</th>
+                <th className="p-4">OrderNo / Serial</th>
                 <th className="p-4">Date/Time</th>
                 <th className="p-4">Status</th>
                 <th className="p-4 text-right">Total</th>
@@ -1762,8 +1905,11 @@ export const DatabaseViewPage = () => {
                 <React.Fragment key={o.id}>
                   <tr onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`cursor-pointer transition-colors ${expandedId === o.id ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'}`}>
                     <td className="p-4 text-center"><ChevronRight size={14} className={`text-slate-300 transition-transform ${expandedId === o.id ? 'rotate-90 text-blue-500' : ''}`} /></td>
-                    <td className="p-4 font-mono text-slate-500 text-[10px]">{o.serialNo || 'N/A'}</td>
-                    <td className="p-4 font-bold text-slate-700">#{o.orderNo}</td>
+                    <td className="p-4 font-bold text-slate-700">
+                      <div>#{o.orderNo}</div>
+                      {/* NEW: Serial No */}
+                      <div className="text-[9px] text-slate-400 font-mono mt-0.5">{o.serialNo || 'N/A'}</div>
+                    </td>
                     <td className="p-4 text-slate-500 font-medium">{o.date} <span className="text-[10px] text-slate-300 ml-1">{o.time}</span></td>
                     <td className="p-4"><span className={`font-bold uppercase text-[9px] ${o.status === 'closed' ? 'text-slate-400' : 'text-green-600'}`}>{o.status}</span></td>
                     <td className={`p-4 text-right font-black font-mono ${o.isVoided ? 'text-slate-300 line-through' : 'text-slate-900'}`}>${o.total}</td>
@@ -1771,7 +1917,6 @@ export const DatabaseViewPage = () => {
                     <td className="p-4 text-center"><button onClick={(e) => { e.stopPropagation(); setEditingOrder(o); }} className="p-1.5 text-slate-400 hover:text-blue-600"><Edit2 size={14} /></button></td>
                     <td className="p-4 text-right"><button onClick={(e) => { e.stopPropagation(); setViewJson(o); }} className="p-1.5 text-slate-300 hover:text-blue-500"><Code size={14} /></button></td>
                   </tr>
-
                   {/* Expanded Detail Row */}
                   {expandedId === o.id && (
                     <tr className="bg-blue-50/20">
@@ -1797,7 +1942,7 @@ export const DatabaseViewPage = () => {
                                     <tr key={idx} className="hover:bg-blue-50/10">
                                       <td className="p-2 font-bold text-slate-600">
                                         {item.name}
-                                        {/* 客製化標籤 */}
+                                        {/* 新增：顯示客製化標籤 */}
                                         <div className="flex flex-wrap gap-1 mt-1">
                                           {Object.values(item.selectedModules || {}).map((val, i) => (
                                             <span key={i} className="text-[9px] text-slate-500 bg-slate-100 px-1 py-0.5 rounded font-bold border border-slate-200">
@@ -1817,15 +1962,16 @@ export const DatabaseViewPage = () => {
                             </div>
                           </div>
 
-                          {/* 右側：元數據摘要 (Simplified) */}
+                          {/* 右側：元數據摘要 */}
                           <div className="space-y-4">
                             <h4 className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-2"><ListFilter size={12} /> 系統元數據 (Meta)</h4>
                             <div className="grid grid-cols-2 gap-3 text-[10px]">
+                              {/* 顯示 UUID 與 SN */}
                               <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2"><p className="text-slate-400 font-bold mb-1">內部唯一 ID (UUID)</p><p className="font-mono text-slate-600 break-all">{o.id}</p></div>
-                              <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1">序號 (SN)</p><p className="font-mono text-slate-600">{o.serialNo || 'N/A'}</p></div>
-                              <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1">交易類型</p><p className="font-bold text-slate-600">{o.orderType === 'takeOut' ? '🥡 外帶' : '🍽️ 內用'}</p></div>
+                              <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1 flex items-center gap-1"><Hash size={10} /> 序號 (SN)</p><p className="font-mono text-slate-800 text-sm">{o.serialNo || 'N/A'}</p></div>
+                              <div className="bg-white p-3 rounded-xl border border-slate-100"><p className="text-slate-400 font-bold mb-1 flex items-center gap-1"><Fingerprint size={10} /> 訂單編號</p><p className="font-bold text-slate-800 text-sm">#{o.orderNo}</p></div>
 
-                              {/* 還原：顯示金額摘要 (小計、折扣、總計) */}
+                              {/* 顯示金額摘要 */}
                               <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2">
                                 <p className="text-slate-400 font-bold mb-2 border-b border-slate-100 pb-1">財務摘要</p>
                                 <div className="flex justify-between mb-1"><span className="text-slate-500">小計</span><span className="font-mono">${o.total + (o.discount || 0)}</span></div>
@@ -1856,74 +2002,130 @@ export const DatabaseViewPage = () => {
         </div>
 
         {/* 分頁控制 */}
-        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center gap-4 shrink-0 rounded-b-3xl">
-          <div className="text-[11px] font-bold text-slate-400 uppercase">顯示 {filteredOrders.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, filteredOrders.length)} 筆</div>
+        <div className="bg-slate-50 p-4 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0 rounded-b-3xl">
+          <div className="flex items-center gap-4">
+            <div className="text-[11px] font-bold text-slate-400 uppercase">
+              顯示 {filteredOrders.length > 0 ? (safeCurrentPage - 1) * pageSize + 1 : 0} - {Math.min(safeCurrentPage * pageSize, filteredOrders.length)} 筆，共 {filteredOrders.length} 筆
+            </div>
+            {/* 新增：切換每頁筆數 */}
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-600 font-bold bg-white cursor-pointer hover:bg-slate-50 transition-colors"
+            >
+              <option value={10}>10 筆 / 頁</option>
+              <option value={25}>25 筆 / 頁</option>
+              <option value={50}>50 筆 / 頁</option>
+              <option value={100}>100 筆 / 頁</option>
+            </select>
+          </div>
           <div className="flex items-center gap-1">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="p-1.5 rounded-lg border bg-white disabled:opacity-30"><ChevronLeft size={16} /></button>
-            <span className="text-blue-600 font-mono text-xs font-black mx-2">{currentPage} / {totalPages || 1}</span>
-            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => prev + 1)} className="p-1.5 rounded-lg border bg-white disabled:opacity-30"><ChevronRight size={16} /></button>
+            <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronsLeft size={16} /></button>
+            <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(prev => (prev === '' ? 1 : prev) - 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronLeft size={16} /></button>
+
+            {/* 可編輯的當前頁碼輸入框 */}
+            <div className="flex items-center px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black justify-center">
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={currentPage}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  if (val === '') setCurrentPage('');
+                  else {
+                    let p = parseInt(val, 10);
+                    if (totalPages > 0 && p > totalPages) p = totalPages;
+                    if (p < 1) p = 1;
+                    setCurrentPage(p);
+                  }
+                }}
+                onBlur={() => { if (currentPage === '' || currentPage < 1) setCurrentPage(1); }}
+                className="w-8 text-center text-blue-600 font-mono outline-none bg-slate-50 rounded px-1 py-0.5"
+              />
+              <span className="mx-2 text-slate-300">/</span><span className="text-slate-500 font-mono pr-2">{totalPages || 1}</span>
+            </div>
+
+            <button disabled={safeCurrentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(prev => (prev === '' ? 1 : prev) + 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronRight size={16} /></button>
+            <button disabled={safeCurrentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(totalPages)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronsRight size={16} /></button>
           </div>
         </div>
       </div>
 
       {/* 檢視 JSON */}
-      {viewJson && (<div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"><div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden"><div className="p-8 border-b flex justify-between items-center bg-slate-50"><h3 className="font-black text-xl">JSON</h3><button onClick={() => setViewJson(null)}><X size={24} /></button></div><div className="flex-1 overflow-auto p-8 bg-slate-900 font-mono"><pre className="text-green-400 text-xs">{JSON.stringify(viewJson, null, 2)}</pre></div></div></div>)}
-
-      {/* 編輯訂單 */}
-      {editingOrder && (<div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"><div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl"><h3 className="font-black text-xl mb-4">編輯訂單 #{editingOrder.orderNo}</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-500">狀態 (Status)</label>
-            <select
-              className="w-full border rounded-lg p-2 mt-1"
-              value={editingOrder.status}
-              onChange={e => setEditingOrder({ ...editingOrder, status: e.target.value })}
-            >
-              <option value="unclosed">Unclosed</option>
-              <option value="closed">Closed</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500">付款狀態 (Payment)</label>
-            <select
-              className="w-full border rounded-lg p-2 mt-1"
-              value={editingOrder.paymentStatus}
-              onChange={e => setEditingOrder({ ...editingOrder, paymentStatus: e.target.value })}
-            >
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500">日期 (YYYY-MM-DD) <span className="text-red-500">*</span></label>
-            <input
-              className="w-full border rounded-lg p-2 mt-1 font-mono"
-              value={editingOrder.date}
-              onChange={e => setEditingOrder({ ...editingOrder, date: e.target.value })}
-            />
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            <input
-              type="checkbox"
-              id="voidCheck"
-              checked={editingOrder.isVoided}
-              onChange={e => setEditingOrder({ ...editingOrder, isVoided: e.target.checked })}
-              className="w-4 h-4 accent-red-600"
-            />
-            <label htmlFor="voidCheck" className="text-sm font-bold text-slate-700">標記為已作廢 (Voided)</label>
+      {viewJson && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in font-sans text-slate-900">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+            <div className="p-8 border-b flex justify-between items-center bg-slate-50 font-sans"><h3 className="font-black text-xl">原始數據 JSON - #{viewJson.orderNo}</h3><button onClick={() => setViewJson(null)} className="p-2 hover:bg-red-100 text-red-500 rounded-2xl transition-all"><X size={24} /></button></div>
+            <div className="flex-1 overflow-auto p-8 bg-slate-900 font-mono"><pre className="text-green-400 text-xs whitespace-pre-wrap leading-relaxed">{JSON.stringify(viewJson, null, 2)}</pre></div>
           </div>
         </div>
-        <div className="flex gap-4 mt-6"><button onClick={() => setEditingOrder(null)} className="flex-1 py-2 bg-slate-100 rounded-xl font-bold">取消</button><button onClick={() => handleUpdateOrder(editingOrder)} className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold">儲存</button></div></div></div>)}
+      )}
+
+      {/* 編輯訂單 */}
+      {editingOrder && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <h3 className="font-black text-xl mb-4">編輯訂單 #{editingOrder.orderNo}</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500">狀態 (Status)</label>
+                <select
+                  className="w-full border rounded-lg p-2 mt-1"
+                  value={editingOrder.status}
+                  onChange={e => setEditingOrder({ ...editingOrder, status: e.target.value })}
+                >
+                  <option value="unclosed">Unclosed</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500">付款狀態 (Payment)</label>
+                <select
+                  className="w-full border rounded-lg p-2 mt-1"
+                  value={editingOrder.paymentStatus}
+                  onChange={e => setEditingOrder({ ...editingOrder, paymentStatus: e.target.value })}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500">日期 (YYYY-MM-DD) <span className="text-red-500">*</span></label>
+                <input
+                  className="w-full border rounded-lg p-2 mt-1 font-mono"
+                  value={editingOrder.date}
+                  onChange={e => setEditingOrder({ ...editingOrder, date: e.target.value })}
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="checkbox"
+                  id="voidCheck"
+                  checked={editingOrder.isVoided}
+                  onChange={e => setEditingOrder({ ...editingOrder, isVoided: e.target.checked })}
+                  className="w-4 h-4 accent-red-600"
+                />
+                <label htmlFor="voidCheck" className="text-sm font-bold text-slate-700">標記為已作廢 (Voided)</label>
+              </div>
+            </div>
+            <div className="flex gap-4 mt-6">
+              <button onClick={() => setEditingOrder(null)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-slate-500">取消</button>
+              <button onClick={() => handleUpdateOrder(editingOrder)} className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg">儲存變更</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// --- 13. SettingsPage ---
+// --- 13. 系統設定 ---
 export const SettingsPage = () => {
   const { config, setConfig, showAlert } = useContext(POSContext);
   const [isEdit, setIsEdit] = useState(false);
   const [temp, setTemp] = useState(config?.storeName || '');
-  const handleSave = () => { setConfig(p => ({ ...p, storeName: temp })); setIsEdit(false); showAlert('成功', '已儲存'); };
+  const handleSave = () => { setConfig(p => ({ ...p, storeName: temp })); setIsEdit(false); showAlert('成功', '儲存成功', 'success'); };
   return (
     <div className="max-w-2xl mx-auto w-full font-sans pb-32 animate-in fade-in slide-in-from-bottom-2 px-4 text-slate-900">
       <h2 className="text-2xl font-black mb-8 px-2 tracking-tight uppercase">系統參數設定</h2>
@@ -1966,11 +2168,6 @@ export const SettingsPage = () => {
           </div>
         </section>
       </div>
-      {isEdit && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t flex justify-center lg:hidden">
-          <button onClick={handleSave} className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg">儲存設定</button>
-        </div>
-      )}
     </div>
   );
 };
