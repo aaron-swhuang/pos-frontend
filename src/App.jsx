@@ -114,10 +114,11 @@ const generateCartItemId = (item, selectedModules) => {
 const getUpdatedCart = (prevCart, newItem) => {
   const cartId = generateCartItemId(newItem, newItem.selectedModules);
   const existing = prevCart.find(i => i.cartId === cartId);
+  const addQty = newItem.quantity || 1;
   if (existing) {
-    return prevCart.map(i => i.cartId === cartId ? { ...i, quantity: i.quantity + 1 } : i);
+    return prevCart.map(i => i.cartId === cartId ? { ...i, quantity: i.quantity + addQty } : i);
   }
-  return [...prevCart, { ...newItem, cartId, quantity: 1 }];
+  return [...prevCart, { ...newItem, cartId, quantity: addQty }];
 };
 
 // --- 1. 全域資料管理中心 ---
@@ -310,14 +311,17 @@ const Keypad = ({ onInput, onClear, onDelete }) => {
 // --- 2.5 ProductOptionModal ---
 const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }) => {
   const [selectedModules, setSelectedModules] = useState({});
+  const [modifyQuantity, setModifyQuantity] = useState(1);
 
   useEffect(() => {
     if (isOpen && product) {
       if (initialData) {
         setSelectedModules(initialData.selectedModules || {});
+        setModifyQuantity(initialData.quantity || 1);
       } else {
         const defaults = {};
         setSelectedModules(defaults);
+        setModifyQuantity(1);
       }
     }
   }, [isOpen, product, initialData]);
@@ -354,7 +358,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
       ...product,
       selectedModules,
       price: calculateCurrentPrice()
-    });
+    }, Number(modifyQuantity) || 1);
     onClose();
   };
 
@@ -418,6 +422,38 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
           ))}
           {safeModules.length === 0 && <div className="text-center text-slate-400 py-10">此商品無客製化選項</div>}
         </div>
+
+        {/* 新增：拆單數量選擇器 (僅在編輯且數量 > 1 時顯示) */}
+        {initialData && initialData.quantity > 1 && (
+          <div className="px-6 py-4 bg-blue-50/50 border-t border-blue-100 flex justify-between items-center shrink-0 animate-in fade-in">
+            <div>
+              <p className="text-sm font-black text-blue-800">套用數量 (拆單修改)</p>
+              <p className="text-[10px] font-bold text-blue-500 mt-0.5">選擇要修改客製化的份數</p>
+            </div>
+            <div className="flex items-center bg-white border border-blue-200 rounded-xl overflow-hidden h-10 shadow-sm">
+              <button onClick={() => setModifyQuantity(Math.max(1, (Number(modifyQuantity) || 1) - 1))} className="px-3 h-full hover:bg-blue-50 text-blue-600 transition-colors"><Minus size={14} /></button>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={modifyQuantity}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  if (val === '') setModifyQuantity('');
+                  else {
+                    let num = parseInt(val, 10);
+                    if (num > initialData.quantity) num = initialData.quantity;
+                    setModifyQuantity(num);
+                  }
+                }}
+                onBlur={() => { if (modifyQuantity === '' || Number(modifyQuantity) < 1) setModifyQuantity(1); }}
+                className="w-10 h-full text-center font-black text-slate-800 outline-none bg-transparent"
+              />
+              <button onClick={() => setModifyQuantity(Math.min(initialData.quantity, (Number(modifyQuantity) || 1) + 1))} className="px-3 h-full hover:bg-blue-50 text-blue-600 transition-colors"><Plus size={14} /></button>
+            </div>
+          </div>
+        )}
+
         <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase">小計金額</p>
@@ -703,18 +739,31 @@ export const POSPage = () => {
     }
   };
 
-  const handleOptionConfirm = (configuredItem) => {
-    const newItem = {
-      ...configuredItem,
-      quantity: optionModal.initialData ? optionModal.initialData.quantity : 1
-    };
+  const handleOptionConfirm = (configuredItem, modifyQuantity) => {
+    const qtyToApply = modifyQuantity || 1;
 
     setCart(prev => {
-      let currentCart = prev;
+      let currentCart = [...prev];
       if (optionModal.initialData) {
         const oldId = generateCartItemId(optionModal.initialData, optionModal.initialData.selectedModules);
-        currentCart = prev.filter(i => i.cartId !== oldId);
+        const remainingQty = optionModal.initialData.quantity - qtyToApply;
+
+        // 1. 先把原本的品項完全移除
+        currentCart = currentCart.filter(i => i.cartId !== oldId);
+
+        // 2. 如果沒有全部修改（拆單），把剩餘數量的原本品項加回去
+        if (remainingQty > 0) {
+          const oldItemRestored = { ...optionModal.initialData, quantity: remainingQty };
+          currentCart = getUpdatedCart(currentCart, oldItemRestored);
+        }
       }
+
+      // 3. 加上修改後的新品項
+      const newItem = {
+        ...configuredItem,
+        quantity: qtyToApply
+      };
+
       return getUpdatedCart(currentCart, newItem);
     });
   };
