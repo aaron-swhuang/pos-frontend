@@ -272,6 +272,58 @@ describe('StaffManagementPage (員工與權限管理) UI 測試', () => {
     fireEvent.click(screen.getByRole('button', { name: /權限角色/i }));
     expect(screen.getByText(/自訂新角色/i)).toBeDefined();
   });
+
+  test('應正確渲染現有員工列表', () => {
+    render(
+      <POSContext.Provider value={getMockContextValue()}>
+        <StaffManagementPage />
+      </POSContext.Provider>
+    );
+
+    // 驗證預設的 mockUsers 是否成功顯示在列表中
+    expect(screen.getByText('系統工程師')).toBeDefined();
+    expect(screen.getByText('店長')).toBeDefined();
+    expect(screen.getByText('櫃檯人員')).toBeDefined();
+
+    // 驗證帳號名稱是否出現
+    expect(screen.getByText('dev')).toBeDefined();
+    expect(screen.getByText('admin')).toBeDefined();
+  });
+
+  test('權限角色頁籤應正確標示 System Default (系統預設角色)', () => {
+    render(
+      <POSContext.Provider value={getMockContextValue()}>
+        <StaffManagementPage />
+      </POSContext.Provider>
+    );
+
+    // 切換至權限角色頁籤
+    fireEvent.click(screen.getByRole('button', { name: /權限角色/i }));
+
+    // 驗證預設角色是否有渲染
+    expect(screen.getByText('開發者')).toBeDefined();
+    expect(screen.getByText('店舖主管')).toBeDefined();
+
+    // 驗證是否有加上防呆的 System Default 標籤 (預設共有三個：developer, manager, staff)
+    const defaultTags = screen.getAllByText(/System Default/i);
+    expect(defaultTags.length).toBe(3);
+  });
+
+  test('操作防呆：嘗試刪除系統核心開發者帳號時應觸發警告', () => {
+    const mockShowAlert = vi.fn();
+    render(
+      <POSContext.Provider value={getMockContextValue({ showAlert: mockShowAlert })}>
+        <StaffManagementPage />
+      </POSContext.Provider>
+    );
+
+    // 抓取所有刪除按鈕 (根據 mockUsers 順序，第 0 個是 dev)
+    const deleteButtons = screen.getAllByTitle('刪除帳號');
+    fireEvent.click(deleteButtons[0]);
+
+    // 驗證是否呼叫了阻擋刪除的 showAlert
+    expect(mockShowAlert).toHaveBeenCalledWith('操作拒絕', '系統核心開發者帳號無法刪除，以防系統失聯。', 'danger');
+  });
 });
 
 describe('SettingsPage (系統設定) UI 測試', () => {
