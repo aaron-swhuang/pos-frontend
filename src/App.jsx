@@ -8,7 +8,7 @@ import {
   ShieldCheck, RotateCcw, AlertTriangle, Save, Ticket, Eye, EyeOff,
   Receipt, Database, Copy, Code, ChevronLeft,
   ChevronsLeft, ChevronsRight, ListFilter, Info, Calendar, FilterX, Play,
-  StopCircle, Lock, Coins, Layers, Check, Box, Bug, CheckCircle2, Hash, Fingerprint
+  StopCircle, Lock, Coins, Layers, Check, Box, Bug, CheckCircle2, Hash, Fingerprint, Keyboard
 } from 'lucide-react';
 
 // --- Helpers: 統一日期與時間格式 ---
@@ -162,8 +162,9 @@ export const POSProvider = ({ children }) => {
     { id: 3, name: '現折 $10', type: 'amount', value: 10 }
   ]));
 
+  // 新增：enableVirtualNumpad 設定 (預設 false)
   const [config, setConfig] = useState(() => safeJsonParse('pos_config', {
-    dineInMode: 'prePay', storeName: 'Smart POS', enableCreditCard: true, enableMobilePayment: true
+    dineInMode: 'prePay', storeName: 'Smart POS', enableCreditCard: true, enableMobilePayment: true, enableVirtualNumpad: false
   }));
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -175,6 +176,17 @@ export const POSProvider = ({ children }) => {
   const [modal, setModal] = useState({
     isOpen: false, title: '', message: '', type: 'info', onConfirm: null, onCancel: null, confirmText: '確認', cancelText: '取消'
   });
+
+  // 全域虛擬數字鍵盤狀態
+  const [numpad, setNumpad] = useState({ isOpen: false, value: '', onConfirm: null, title: '', allowDecimal: true });
+
+  const openNumpad = (title, initialValue, onConfirm, allowDecimal = true) => {
+    setNumpad({ isOpen: true, value: String(initialValue), onConfirm, title, allowDecimal });
+  };
+
+  const closeNumpad = () => {
+    setNumpad(prev => ({ ...prev, isOpen: false }));
+  };
 
   // --- 自動修復舊日期格式 (Migration Effect) ---
   useEffect(() => {
@@ -260,7 +272,8 @@ export const POSProvider = ({ children }) => {
       menu, setMenu, orders, setOrders, dailySummaries, setDailySummaries,
       discountRules, setDiscountRules, modifierTemplates, setModifierTemplates,
       isLoggedIn, setIsLoggedIn, config, setConfig,
-      shift, setShift, openShift, showAlert, showConfirm, modal
+      shift, setShift, openShift, showAlert, showConfirm, modal,
+      numpad, openNumpad, closeNumpad // 輸出給 GlobalNumpad 與 VirtualInput 使用
     }}>
       {children}
     </POSContext.Provider>
@@ -294,6 +307,98 @@ const GlobalModal = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// 新增：全域虛擬數字鍵盤元件 (GlobalNumpad)
+const GlobalNumpad = () => {
+  const { numpad, closeNumpad } = useContext(POSContext);
+  const [val, setVal] = useState('');
+
+  useEffect(() => {
+    if (numpad.isOpen) setVal(String(numpad.value || ''));
+  }, [numpad]);
+
+  if (!numpad.isOpen) return null;
+
+  const handleInput = (key) => {
+    if (key === '.' && (!numpad.allowDecimal || val.includes('.'))) return;
+    setVal(prev => {
+      if (prev === '0' && key !== '.') return key;
+      return prev + key;
+    });
+  };
+
+  const handleDelete = () => setVal(p => p.length > 0 ? p.slice(0, -1) : '');
+  const handleClear = () => setVal('');
+
+  const handleConfirm = () => {
+    if (numpad.onConfirm) numpad.onConfirm(val);
+    closeNumpad();
+  };
+
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '00', '.'];
+
+  return (
+    <div className="fixed inset-0 z-[400] flex items-end justify-center bg-slate-900/40 backdrop-blur-sm animate-in fade-in pb-4">
+      <div className="bg-slate-100 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full p-6 border border-white/20">
+        <div className="flex justify-between items-center mb-4 px-2">
+          <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
+            <Keyboard size={14} className="text-blue-500" />
+            {numpad.title}
+          </h3>
+          <button onClick={closeNumpad} className="p-2 bg-slate-200 text-slate-500 rounded-full hover:bg-slate-300 transition-colors"><X size={16} /></button>
+        </div>
+        <div className="bg-white rounded-[1.5rem] p-4 mb-4 shadow-sm border border-slate-200 flex justify-end items-center min-h-[4.5rem]">
+          <span className="text-4xl font-black font-mono text-blue-600 tracking-tight">{val || '0'}</span>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          <div className="col-span-3 grid grid-cols-3 gap-2">
+            {keys.map(k => (
+              <button key={k} onClick={() => handleInput(k)} className="h-16 bg-white rounded-[1rem] shadow-sm border border-slate-200 text-2xl font-bold text-slate-800 active:scale-95 hover:border-blue-300 hover:text-blue-600 transition-all">{k}</button>
+            ))}
+          </div>
+          <div className="col-span-1 flex flex-col gap-2">
+            <button onClick={handleDelete} className="h-16 bg-slate-200 rounded-[1rem] flex items-center justify-center text-slate-600 active:scale-95 hover:bg-slate-300 transition-colors"><ChevronLeft size={28} /></button>
+            <button onClick={handleClear} className="h-16 bg-red-50 border border-red-100 rounded-[1rem] flex items-center justify-center text-red-500 font-bold text-lg active:scale-95 hover:bg-red-100 transition-colors uppercase">AC</button>
+            <button onClick={handleConfirm} className="flex-1 bg-blue-600 rounded-[1rem] flex items-center justify-center text-white font-black active:scale-95 shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all"><Check size={32} /></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 新增：智慧輸入框 (VirtualInput)，根據設定決定使用原生鍵盤還是虛擬鍵盤
+const VirtualInput = ({ value, onChange, title = "輸入數字", allowDecimal = true, className = "", placeholder = "", onBlur }) => {
+  const { config, openNumpad } = useContext(POSContext);
+
+  if (config.enableVirtualNumpad) {
+    return (
+      <input
+        readOnly // 阻止系統原生鍵盤彈出
+        value={value}
+        placeholder={placeholder}
+        className={`${className} cursor-pointer caret-transparent focus:ring-4 focus:ring-blue-100 transition-all`}
+        onClick={() => openNumpad(title, value, (newVal) => {
+          onChange(newVal);
+          if (onBlur) setTimeout(onBlur, 0); // 確保狀態更新後觸發 blur
+        }, allowDecimal)}
+      />
+    );
+  }
+
+  // 設定未開啟時，退回一般原生的 <input> 讓 OS 鍵盤接管
+  return (
+    <input
+      type="text"
+      inputMode={allowDecimal ? "decimal" : "numeric"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      placeholder={placeholder}
+      className={className}
+    />
   );
 };
 
@@ -364,7 +469,6 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
 
   const handleSelectOption = (moduleName, option, type) => {
     setSelectedModules(prev => {
-      // 修正：允許反選 (取消選擇)
       if (prev[moduleName]?.name === option.name) {
         const next = { ...prev };
         delete next[moduleName];
@@ -423,7 +527,6 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
           {safeModules.length === 0 && <div className="text-center text-slate-400 py-10">此商品無客製化選項</div>}
         </div>
 
-        {/* 新增：拆單數量選擇器 (僅在編輯且數量 > 1 時顯示) */}
         {initialData && initialData.quantity > 1 && (
           <div className="px-6 py-4 bg-blue-50/50 border-t border-blue-100 flex justify-between items-center shrink-0 animate-in fade-in">
             <div>
@@ -432,13 +535,13 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
             </div>
             <div className="flex items-center bg-white border border-blue-200 rounded-xl overflow-hidden h-10 shadow-sm">
               <button onClick={() => setModifyQuantity(Math.max(1, (Number(modifyQuantity) || 1) - 1))} className="px-3 h-full hover:bg-blue-50 text-blue-600 transition-colors"><Minus size={14} /></button>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+              {/* 改用 VirtualInput 支援虛擬數字鍵盤 */}
+              <VirtualInput
+                title="修改客製化份數"
+                allowDecimal={false}
                 value={modifyQuantity}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
+                onChange={(v) => {
+                  const val = String(v).replace(/[^0-9]/g, '');
                   if (val === '') setModifyQuantity('');
                   else {
                     let num = parseInt(val, 10);
@@ -748,17 +851,14 @@ export const POSPage = () => {
         const oldId = generateCartItemId(optionModal.initialData, optionModal.initialData.selectedModules);
         const remainingQty = optionModal.initialData.quantity - qtyToApply;
 
-        // 1. 先把原本的品項完全移除
         currentCart = currentCart.filter(i => i.cartId !== oldId);
 
-        // 2. 如果沒有全部修改（拆單），把剩餘數量的原本品項加回去
         if (remainingQty > 0) {
           const oldItemRestored = { ...optionModal.initialData, quantity: remainingQty };
           currentCart = getUpdatedCart(currentCart, oldItemRestored);
         }
       }
 
-      // 3. 加上修改後的新品項
       const newItem = {
         ...configuredItem,
         quantity: qtyToApply
@@ -1014,15 +1114,9 @@ export const AdminPage = () => {
   const [editId, setEditId] = useState(null);
   const [newDisc, setNewDisc] = useState({ name: '', type: 'percentage', value: '' });
 
-  // 模組管理
   const [newTemplate, setNewTemplate] = useState({ name: '', optionsStr: '' });
-
-  // 新增：編輯模組狀態
   const [editingTemplateId, setEditingTemplateId] = useState(null);
-  // 新增：編輯優惠狀態
   const [editingDiscountId, setEditingDiscountId] = useState(null);
-
-  // 控制模組選擇器顯示
   const [showModuleSelector, setShowModuleSelector] = useState(false);
 
   const loadEditItem = (i) => {
@@ -1167,7 +1261,16 @@ export const AdminPage = () => {
             <div className="grid grid-cols-2 gap-4 mb-8">
               <div className="col-span-2"><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">商品名稱</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={item.name} onChange={e => setItem({ ...item, name: e.target.value })} placeholder="例如：拿鐵咖啡" /></div>
               <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">分類</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={item.category} onChange={e => setItem({ ...item, category: e.target.value })} placeholder="例如：咖啡" /></div>
-              <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">基礎價格</label><input type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-mono" value={item.price} onChange={e => setItem({ ...item, price: e.target.value })} /></div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">基礎價格</label>
+                <VirtualInput
+                  title="商品基礎價格"
+                  allowDecimal={false}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  value={item.price}
+                  onChange={val => setItem({ ...item, price: val })}
+                />
+              </div>
             </div>
 
             <div className="mb-8">
@@ -1211,11 +1314,12 @@ export const AdminPage = () => {
                           {mod.type !== 'option' && (
                             <>
                               <span className="text-xs text-slate-400 font-bold">{mod.type === 'variant' ? '單價' : '加價'} $</span>
-                              <input
-                                type="text"
+                              <VirtualInput
+                                title={`${mod.type === 'variant' ? '設定單價' : '設定加價'}`}
+                                allowDecimal={false}
                                 className="w-16 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-right font-mono font-bold text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                                 value={opt.price}
-                                onChange={(e) => updateModuleOptionPrice(mIdx, oIdx, e.target.value)}
+                                onChange={(val) => updateModuleOptionPrice(mIdx, oIdx, val)}
                               />
                             </>
                           )}
@@ -1293,7 +1397,16 @@ export const AdminPage = () => {
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-1">類型</label>
                 <select className="w-full px-3 py-2 bg-slate-50 border rounded-xl" value={newDisc.type} onChange={e => setNewDisc({ ...newDisc, type: e.target.value })}><option value="percentage">折扣 (%)</option><option value="amount">定額折抵 ($)</option></select>
               </div>
-              <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1">數值</label><input type="number" step="0.01" className="w-full px-3 py-2 bg-slate-50 border rounded-xl" value={newDisc.value} onChange={e => setNewDisc({ ...newDisc, value: e.target.value })} /></div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1">數值</label>
+                <VirtualInput
+                  title="優惠數值"
+                  allowDecimal={newDisc.type === 'percentage'}
+                  className="w-full px-3 py-2 bg-slate-50 border rounded-xl"
+                  value={newDisc.value}
+                  onChange={val => setNewDisc({ ...newDisc, value: val })}
+                />
+              </div>
 
               <div className="flex gap-2">
                 {editingDiscountId && (
@@ -1333,13 +1446,11 @@ export const SettlementPage = () => {
   const [expandOrderId, setExpandOrderId] = useState(null);
 
   const currentShiftCompletedOrders = useMemo(() =>
-    // Fix: 確保日期比對使用相同格式 (YYYY-MM-DD)
     orders.filter(o => o.date === shift.businessDate && (o.paymentStatus === 'paid' || o.isVoided)),
     [orders, shift.businessDate]);
 
   const totalRevenue = currentShiftCompletedOrders.filter(o => !o.isVoided).reduce((s, o) => s + o.total, 0);
 
-  // 統計數據計算
   const stats = useMemo(() => {
     return currentShiftCompletedOrders.reduce((acc, order) => {
       if (order.isVoided) {
@@ -1355,22 +1466,18 @@ export const SettlementPage = () => {
     }, { orderCount: 0, voidedCount: 0, itemSales: {}, typeCount: { dineIn: 0, takeOut: 0 } });
   }, [currentShiftCompletedOrders]);
 
-  // 修正：先行結算 (將狀態改為 closed，但保持班次開啟)
   const handlePreSettle = (businessDate, allOrders) => {
     const targetOrders = allOrders.filter(o => o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided));
     if (targetOrders.length === 0) return;
 
-    // 關鍵修復：計算當日總結時，必須拿「當天『所有』已付款或作廢的訂單」，而非只有 targetOrders
     const allDailyOrders = allOrders.filter(o => o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided));
 
-    // 計算當日總結 (改用 allDailyOrders，確保同日重複關帳不會遺失舊數據)
     const summary = allDailyOrders.reduce((acc, order) => {
       if (order.isVoided) { acc.voidedCount += 1; }
       else {
         acc.total += order.total; acc.orderCount += 1; acc.typeCount[order.orderType || 'dineIn'] += 1;
         order.items?.forEach(item => { acc.itemSales[item.name] = (acc.itemSales[item.name] || 0) + (item.quantity || 1); });
       }
-      // 確保彙總的訂單狀態都是 closed
       acc.relatedOrders.push({ ...order, status: 'closed' });
       return acc;
     }, { total: 0, orderCount: 0, voidedCount: 0, itemSales: {}, typeCount: { dineIn: 0, takeOut: 0 }, relatedOrders: [] });
@@ -1379,7 +1486,6 @@ export const SettlementPage = () => {
       const updated = [...prev];
       const existingIdx = updated.findIndex(s => s.date === businessDate);
       if (existingIdx > -1) {
-        // 更新現有日報表：用最新的全日 summary 完整覆蓋
         const existing = { ...updated[existingIdx] };
         existing.total = summary.total;
         existing.orderCount = summary.orderCount;
@@ -1389,25 +1495,19 @@ export const SettlementPage = () => {
         existing.relatedOrders = summary.relatedOrders;
         updated[existingIdx] = existing;
       } else {
-        // Fix: 使用統一的日期時間格式
         updated.push({ id: Date.now(), date: businessDate, ...summary, closedAt: '未關帳 (預覽)' });
       }
       return updated;
     });
 
-    // 將這些訂單標記為 'closed' (已結算)，讓 UI 標籤變色
     setOrders(prev => prev.map(o => (o.status === 'unclosed' && o.date === businessDate && (o.paymentStatus === 'paid' || o.isVoided)) ? { ...o, status: 'closed' } : o));
-
-    // 注意：這裡不呼叫 setShift(isOpen: false)，所以班次保持開啟
     showAlert('成功', '已執行先行結算，訂單狀態已更新。', 'success');
   };
 
   const performSettlement = (businessDate, allOrders) => {
-    // 日結關帳邏輯：與先行結算類似，但會關閉班次
-    handlePreSettle(businessDate, allOrders); // 先結算
-    // Fix: 關閉班次時也使用統一格式
+    handlePreSettle(businessDate, allOrders);
     setDailySummaries(prev => prev.map(s => s.date === businessDate ? { ...s, closedAt: getCurrentDateTime() } : s));
-    setShift({ isOpen: false, businessDate: null, openedAt: null }); // 再關班
+    setShift({ isOpen: false, businessDate: null, openedAt: null });
   };
 
   const renderItemDetails = (items) => (items || []).map((item, idx) => (
@@ -1685,13 +1785,12 @@ export const DashboardPage = () => {
                   <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(prev => (prev === '' ? 1 : prev) - 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronLeft size={16} /></button>
 
                   <div className="flex items-center px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black justify-center">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
+                    <VirtualInput
+                      title="跳轉至頁碼"
+                      allowDecimal={false}
                       value={currentPage}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, '');
+                      onChange={(v) => {
+                        const val = String(v).replace(/[^0-9]/g, '');
                         if (val === '') setCurrentPage('');
                         else {
                           let p = parseInt(val, 10);
@@ -2012,13 +2111,12 @@ export const DatabaseViewPage = () => {
             <button disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(prev => (prev === '' ? 1 : prev) - 1)} className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 transition-all"><ChevronLeft size={16} /></button>
 
             <div className="flex items-center px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black justify-center">
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+              <VirtualInput
+                title="跳轉至頁碼"
+                allowDecimal={false}
                 value={currentPage}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
+                onChange={(v) => {
+                  const val = String(v).replace(/[^0-9]/g, '');
                   if (val === '') setCurrentPage('');
                   else {
                     let p = parseInt(val, 10);
@@ -2111,6 +2209,7 @@ export const SettingsPage = () => {
   const [isEdit, setIsEdit] = useState(false);
   const [temp, setTemp] = useState(config?.storeName || '');
   const handleSave = () => { setConfig(p => ({ ...p, storeName: temp })); setIsEdit(false); showAlert('成功', '儲存成功', 'success'); };
+
   return (
     <div className="max-w-2xl mx-auto w-full font-sans pb-32 animate-in fade-in slide-in-from-bottom-2 px-4 text-slate-900">
       <h2 className="text-2xl font-black mb-8 px-2 tracking-tight uppercase">系統參數設定</h2>
@@ -2127,7 +2226,9 @@ export const SettingsPage = () => {
           </div>
           <div className={`transition-all rounded-2xl ${isEdit ? 'ring-4 ring-blue-50 border-blue-500 shadow-lg' : 'border-slate-100'}`}><input type="text" disabled={!isEdit} className={`w-full px-8 py-5 border rounded-[1.5rem] outline-none font-black text-2xl transition-all ${!isEdit ? 'bg-slate-50 text-slate-500 border-transparent shadow-inner cursor-not-allowed font-mono' : 'bg-white text-slate-900 border-blue-500'}`} value={temp} onChange={e => setTemp(e.target.value)} /></div>
         </section>
+
         <hr className="border-slate-100" />
+
         <section>
           <div className="flex justify-between items-center mb-6 px-1 font-bold">
             <div><h4 className="font-bold text-lg text-slate-700">內用結帳模式</h4><p className="text-xs text-slate-400 mt-1 font-medium">控制內用點餐是否需要立即付款</p></div>
@@ -2137,7 +2238,9 @@ export const SettingsPage = () => {
             </div>
           </div>
         </section>
+
         <hr className="border-slate-100" />
+
         <section className="space-y-8 font-sans">
           <h4 className="font-bold text-lg text-slate-700 flex items-center gap-2 px-1 font-black uppercase tracking-tight"><ShieldCheck size={20} className="text-blue-500" /> 支付通路管理 Integration</h4>
           <div className="space-y-4">
@@ -2152,6 +2255,26 @@ export const SettingsPage = () => {
             ))}
           </div>
         </section>
+
+        <hr className="border-slate-100" />
+
+        {/* 新增：硬體與輸入設定 */}
+        <section className="space-y-8 font-sans">
+          <h4 className="font-bold text-lg text-slate-700 flex items-center gap-2 px-1 font-black uppercase tracking-tight"><Box size={20} className="text-blue-500" /> 硬體與輸入設定</h4>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border border-slate-100/60 shadow-sm transition-all hover:bg-white hover:border-blue-100">
+              <div className="flex items-center gap-5">
+                <div className="p-3.5 bg-white rounded-2xl shadow-sm text-blue-500 border border-slate-50"><Keyboard size={26} /></div>
+                <div>
+                  <p className="text-base font-black text-slate-800">全域虛擬數字鍵盤</p>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5 leading-relaxed">啟用後，點擊數字輸入欄位將彈出系統專屬的超大數字鍵盤</p>
+                </div>
+              </div>
+              <button onClick={() => setConfig(p => ({ ...p, enableVirtualNumpad: !p.enableVirtualNumpad }))} className={`w-16 h-8 rounded-full relative transition-all duration-300 ${config?.enableVirtualNumpad ? 'bg-blue-600' : 'bg-slate-300'}`}><div className={`absolute top-1.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ${config?.enableVirtualNumpad ? 'left-9' : 'left-1.5'} shadow-md`}></div></button>
+            </div>
+          </div>
+        </section>
+
       </div>
       {isEdit && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t flex justify-center lg:hidden">
@@ -2164,7 +2287,7 @@ export const SettingsPage = () => {
 
 // --- 14. 主結構入口 ---
 const MainLayout = () => (
-  <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
+  <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden relative">
     <Sidebar />
     <main className="flex-1 ml-64 p-12 h-screen overflow-y-auto relative scroll-smooth">
       <ErrorBoundary>
@@ -2180,6 +2303,7 @@ const MainLayout = () => (
         </Routes>
       </ErrorBoundary>
       <GlobalModal />
+      <GlobalNumpad /> {/* 放入全域 Numpad 元件 */}
     </main>
   </div>
 );
