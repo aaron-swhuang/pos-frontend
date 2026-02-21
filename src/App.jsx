@@ -6,8 +6,8 @@ import {
   Clock, Search, Tag, Edit2, X, CheckCircle, AlertCircle,
   ClipboardList, Wallet, Banknote, CreditCard, Smartphone,
   ShieldCheck, RotateCcw, AlertTriangle, Save, Ticket, Eye, EyeOff,
-  Receipt, Database, Copy, Code, ChevronLeft,
-  ChevronsLeft, ChevronsRight, ListFilter, Info, Calendar, FilterX, Play,
+  Receipt, Database, Copy, Code, ChevronLeft, Users, UserPlus, Shield,
+  ChevronsLeft, ChevronsRight, ListFilter, Info, FilterX, Play,
   StopCircle, Lock, Coins, Layers, Check, Box, Bug, CheckCircle2, Hash, Fingerprint, Keyboard
 } from 'lucide-react';
 
@@ -31,6 +31,31 @@ const getCurrentTime = () => {
 const getCurrentDateTime = () => {
   return `${getTodayDate()} ${getCurrentTime()}`;
 };
+
+// --- 使用者權限設定 (加入新的 ACCESS_STAFF) ---
+export const PERMISSIONS = {
+  ACCESS_POS: '櫃檯收銀',
+  ACCESS_ORDERS: '訂單管理',
+  VOID_ORDERS: '作廢訂單',
+  ACCESS_SETTLEMENT: '結算作業',
+  ACCESS_ADMIN: '店務管理',
+  ACCESS_STAFF: '員工權限管理', // 新增權限
+  ACCESS_DASHBOARD: '報表分析',
+  ACCESS_SETTINGS: '系統設定',
+  ACCESS_DATABASE: '原始數據(開發者)'
+};
+
+const DEFAULT_ROLES = [
+  { id: 'developer', name: '開發者', permissions: Object.keys(PERMISSIONS) },
+  { id: 'manager', name: '店舖主管', permissions: ['ACCESS_POS', 'ACCESS_ORDERS', 'VOID_ORDERS', 'ACCESS_SETTLEMENT', 'ACCESS_ADMIN', 'ACCESS_STAFF', 'ACCESS_DASHBOARD', 'ACCESS_SETTINGS'] },
+  { id: 'staff', name: '一般店員', permissions: ['ACCESS_POS', 'ACCESS_ORDERS'] }
+];
+
+const DEFAULT_USERS = [
+  { id: 1, username: 'dev', password: '123', name: '系統工程師', roleId: 'developer' },
+  { id: 2, username: 'admin', password: '123', name: '店長', roleId: 'manager' },
+  { id: 3, username: 'staff', password: '123', name: '櫃檯人員', roleId: 'staff' },
+];
 
 // --- DEBUG: Error Boundary ---
 class ErrorBoundary extends React.Component {
@@ -162,12 +187,15 @@ export const POSProvider = ({ children }) => {
     { id: 3, name: '現折 $10', type: 'amount', value: 10 }
   ]));
 
-  // 新增：enableVirtualNumpad 設定 (預設 false)
   const [config, setConfig] = useState(() => safeJsonParse('pos_config', {
     dineInMode: 'prePay', storeName: 'Smart POS', enableCreditCard: true, enableMobilePayment: true, enableVirtualNumpad: false
   }));
 
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [users, setUsers] = useState(() => safeJsonParse('pos_users', DEFAULT_USERS));
+  const [roles, setRoles] = useState(() => safeJsonParse('pos_roles', DEFAULT_ROLES));
+
+  // 目前登入的使用者狀態
+  const [currentUser, setCurrentUser] = useState(() => safeJsonParse('pos_current_user', null));
 
   const [shift, setShift] = useState(() => safeJsonParse('pos_shift', {
     isOpen: false, businessDate: null, openedAt: null
@@ -177,7 +205,6 @@ export const POSProvider = ({ children }) => {
     isOpen: false, title: '', message: '', type: 'info', onConfirm: null, onCancel: null, confirmText: '確認', cancelText: '取消'
   });
 
-  // 全域虛擬數字鍵盤狀態
   const [numpad, setNumpad] = useState({ isOpen: false, value: '', onConfirm: null, title: '', allowDecimal: true });
 
   const openNumpad = (title, initialValue, onConfirm, allowDecimal = true) => {
@@ -188,43 +215,39 @@ export const POSProvider = ({ children }) => {
     setNumpad(prev => ({ ...prev, isOpen: false }));
   };
 
-  // --- 自動修復舊日期格式 (Migration Effect) ---
+  // 系統遷移機制：確保舊資料擁有新的權限標籤
+  useEffect(() => {
+    setRoles(prevRoles => {
+      let changed = false;
+      const updatedRoles = prevRoles.map(role => {
+        if (role.id === 'developer') {
+          const missing = Object.keys(PERMISSIONS).filter(p => !role.permissions.includes(p));
+          if (missing.length > 0) { changed = true; return { ...role, permissions: [...role.permissions, ...missing] }; }
+        }
+        if (role.id === 'manager' && !role.permissions.includes('ACCESS_STAFF')) {
+          changed = true; return { ...role, permissions: [...role.permissions, 'ACCESS_STAFF'] };
+        }
+        return role;
+      });
+      return changed ? updatedRoles : prevRoles;
+    });
+  }, []);
+
   useEffect(() => {
     const fixDate = (d) => {
       if (!d || typeof d !== 'string' || !d.includes('/')) return d;
       const parts = d.split('/');
       if (parts.length === 3) {
-        if (parts[2].length === 4) { // M/D/YYYY
-          return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-        } else if (parts[0].length === 4) { // YYYY/M/D
-          return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-        }
+        if (parts[2].length === 4) { return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`; }
+        else if (parts[0].length === 4) { return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`; }
       }
       return d;
     };
-
-    let shiftFixed = false;
-    let ordersFixed = false;
-    let summariesFixed = false;
-
-    if (shift.businessDate && shift.businessDate.includes('/')) {
-      setShift(prev => ({ ...prev, businessDate: fixDate(prev.businessDate) }));
-      shiftFixed = true;
-    }
-
-    if (orders.some(o => o.date && o.date.includes('/'))) {
-      setOrders(prev => prev.map(o => ({ ...o, date: fixDate(o.date) })));
-      ordersFixed = true;
-    }
-
-    if (dailySummaries.some(s => s.date && s.date.includes('/'))) {
-      setDailySummaries(prev => prev.map(s => ({ ...s, date: fixDate(s.date) })));
-      summariesFixed = true;
-    }
-
-    if (shiftFixed || ordersFixed || summariesFixed) {
-      console.log('[System] Date format migration applied.');
-    }
+    let fixed = false;
+    if (shift.businessDate && shift.businessDate.includes('/')) { setShift(p => ({ ...p, businessDate: fixDate(p.businessDate) })); fixed = true; }
+    if (orders.some(o => o.date && o.date.includes('/'))) { setOrders(p => p.map(o => ({ ...o, date: fixDate(o.date) }))); fixed = true; }
+    if (dailySummaries.some(s => s.date && s.date.includes('/'))) { setDailySummaries(p => p.map(s => ({ ...s, date: fixDate(s.date) }))); fixed = true; }
+    if (fixed) console.log('[System] Date format migration applied.');
   }, []);
 
   const showAlert = (title, message, type = 'info') => {
@@ -253,6 +276,12 @@ export const POSProvider = ({ children }) => {
     showAlert('開帳成功', `營業日已設定為 ${today}。`, 'success');
   };
 
+  const hasPermission = (permissionKey) => {
+    if (!currentUser) return false;
+    const userRole = roles.find(r => r.id === currentUser.roleId);
+    return userRole ? userRole.permissions.includes(permissionKey) : false;
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem('pos_templates', JSON.stringify(modifierTemplates));
@@ -262,18 +291,21 @@ export const POSProvider = ({ children }) => {
       localStorage.setItem('pos_config', JSON.stringify(config));
       localStorage.setItem('pos_discounts', JSON.stringify(discountRules));
       localStorage.setItem('pos_shift', JSON.stringify(shift));
+      localStorage.setItem('pos_current_user', JSON.stringify(currentUser));
+      localStorage.setItem('pos_users', JSON.stringify(users));
+      localStorage.setItem('pos_roles', JSON.stringify(roles));
     } catch (e) {
       console.error("[POS_DEBUG] Storage save failed", e);
     }
-  }, [menu, orders, dailySummaries, config, discountRules, shift, modifierTemplates]);
+  }, [menu, orders, dailySummaries, config, discountRules, shift, modifierTemplates, currentUser, users, roles]);
 
   return (
     <POSContext.Provider value={{
       menu, setMenu, orders, setOrders, dailySummaries, setDailySummaries,
       discountRules, setDiscountRules, modifierTemplates, setModifierTemplates,
-      isLoggedIn, setIsLoggedIn, config, setConfig,
-      shift, setShift, openShift, showAlert, showConfirm, modal,
-      numpad, openNumpad, closeNumpad // 輸出給 GlobalNumpad 與 VirtualInput 使用
+      currentUser, setCurrentUser, users, setUsers, roles, setRoles, hasPermission,
+      config, setConfig, shift, setShift, openShift, showAlert, showConfirm, modal,
+      numpad, openNumpad, closeNumpad
     }}>
       {children}
     </POSContext.Provider>
@@ -310,7 +342,6 @@ const GlobalModal = () => {
   );
 };
 
-// 新增：全域虛擬數字鍵盤元件 (GlobalNumpad)
 const GlobalNumpad = () => {
   const { numpad, closeNumpad } = useContext(POSContext);
   const [val, setVal] = useState('');
@@ -369,26 +400,23 @@ const GlobalNumpad = () => {
   );
 };
 
-// 新增：智慧輸入框 (VirtualInput)，根據設定決定使用原生鍵盤還是虛擬鍵盤
 const VirtualInput = ({ value, onChange, title = "輸入數字", allowDecimal = true, className = "", placeholder = "", onBlur }) => {
   const { config, openNumpad } = useContext(POSContext);
 
   if (config.enableVirtualNumpad) {
     return (
       <input
-        readOnly // 阻止系統原生鍵盤彈出
+        readOnly
         value={value}
         placeholder={placeholder}
         className={`${className} cursor-pointer caret-transparent focus:ring-4 focus:ring-blue-100 transition-all`}
         onClick={() => openNumpad(title, value, (newVal) => {
           onChange(newVal);
-          if (onBlur) setTimeout(onBlur, 0); // 確保狀態更新後觸發 blur
+          if (onBlur) setTimeout(onBlur, 0);
         }, allowDecimal)}
       />
     );
   }
-
-  // 設定未開啟時，退回一般原生的 <input> 讓 OS 鍵盤接管
   return (
     <input
       type="text"
@@ -438,7 +466,6 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
   const calculateCurrentPrice = () => {
     let finalPrice = 0;
     let hasVariantSet = false;
-
     safeModules.forEach(mod => {
       const selectedOpt = selectedModules[mod.name];
       if (mod.type === 'variant' && selectedOpt) {
@@ -446,9 +473,7 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
         hasVariantSet = true;
       }
     });
-
     if (!hasVariantSet) { finalPrice = product.price || 0; }
-
     safeModules.forEach(mod => {
       const selectedOpt = selectedModules[mod.name];
       if (mod.type === 'addon' && selectedOpt) {
@@ -535,7 +560,6 @@ const ProductOptionModal = ({ isOpen, onClose, product, onConfirm, initialData }
             </div>
             <div className="flex items-center bg-white border border-blue-200 rounded-xl overflow-hidden h-10 shadow-sm">
               <button onClick={() => setModifyQuantity(Math.max(1, (Number(modifyQuantity) || 1) - 1))} className="px-3 h-full hover:bg-blue-50 text-blue-600 transition-colors"><Minus size={14} /></button>
-              {/* 改用 VirtualInput 支援虛擬數字鍵盤 */}
               <VirtualInput
                 title="修改客製化份數"
                 allowDecimal={false}
@@ -749,15 +773,16 @@ export const VoidReasonModal = ({ isOpen, onClose, onConfirm }) => {
 
 // --- 5. LoginPage ---
 export const LoginPage = () => {
-  const { setIsLoggedIn, showAlert } = useContext(POSContext);
+  const { setCurrentUser, showAlert, users, roles } = useContext(POSContext);
   const [auth, setAuth] = useState({ user: '', pass: '' });
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (auth.user === 'admin' && auth.pass === 'posadmin') {
-      setIsLoggedIn(true);
+    const user = users.find(u => u.username === auth.user && u.password === auth.pass);
+    if (user) {
+      setCurrentUser(user);
     } else {
-      showAlert('登入失敗', '帳號或密碼錯誤。預設帳號為 admin，密碼為 posadmin。', 'danger');
+      showAlert('登入失敗', '帳號或密碼錯誤，請確認輸入是否正確。', 'danger');
     }
   };
 
@@ -769,18 +794,47 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 relative">
-        <button onClick={handleReset} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 p-2" title="重置系統資料"><Bug size={16} /></button>
-        <div className="bg-slate-900 p-12 text-white flex items-center justify-center gap-6">
-          <div className="inline-flex p-4 bg-blue-600 rounded-2xl shadow-lg"><User size={32} /></div>
-          <h2 className="text-3xl font-black tracking-tight">POS 系統登入</h2>
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 font-sans">
+      <div className="w-full md:w-[45%] bg-slate-900 text-white flex flex-col justify-center p-12 lg:p-24 relative overflow-hidden">
+        <button onClick={handleReset} className="absolute top-6 left-6 text-slate-600 hover:text-red-500 p-2 transition-colors z-10" title="重置系統資料"><Bug size={20} /></button>
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div className="absolute top-0 right-0 w-72 h-72 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+
+        <div className="relative z-10">
+          <div className="inline-flex p-4 bg-blue-600/20 text-blue-400 rounded-3xl mb-8 border border-blue-500/30 backdrop-blur-sm"><Shield size={40} /></div>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">智能 POS 系統</h1>
+          <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-sm mb-12">基於角色的安全存取控制架構，為不同的店舖營運身份提供專屬的權限體驗。</p>
+
+          <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-3xl space-y-4">
+            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-2"><Info size={14} /> 系統現有帳號指南</h4>
+            {users.map(u => {
+              const roleName = roles.find(r => r.id === u.roleId)?.name || '未知角色';
+              return (
+                <div key={u.id} className="flex justify-between items-center text-sm border-b border-slate-700/50 pb-2 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-2 h-2 rounded-full ${u.roleId === 'developer' ? 'bg-purple-500' : u.roleId === 'manager' ? 'bg-blue-500' : 'bg-slate-400'}`}></span>
+                    <span className="font-bold">{roleName} ({u.name})</span>
+                  </div>
+                  <span className="font-mono text-slate-400 bg-slate-900 px-2 py-1 rounded-lg">{u.username} / {u.password}</span>
+                </div>
+              )
+            })}
+          </div>
         </div>
-        <form onSubmit={handleLogin} className="p-10 space-y-6">
-          <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">帳號</label><input className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-all" placeholder="admin" value={auth.user} onChange={e => setAuth({ ...auth, user: e.target.value })} /></div>
-          <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">密碼</label><input type="password" name="password" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-all" placeholder="posadmin" value={auth.pass} onChange={e => setAuth({ ...auth, pass: e.target.value })} /></div>
-          <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-blue-700 active:scale-95 shadow-lg transition-all tracking-widest uppercase">進入系統</button>
-        </form>
+      </div>
+
+      <div className="w-full md:w-[55%] flex items-center justify-center p-8 lg:p-24 relative z-10 bg-white">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
+          <div className="p-10 border-b border-slate-100 bg-slate-50/50 text-center">
+            <h2 className="text-2xl font-black text-slate-800">登入您的帳戶</h2>
+            <p className="text-slate-400 text-sm mt-2 font-bold">請輸入獲授權的員工帳號</p>
+          </div>
+          <form onSubmit={handleLogin} className="p-10 space-y-6">
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">帳號</label><input className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-all" placeholder="例如: admin" value={auth.user} onChange={e => setAuth({ ...auth, user: e.target.value })} /></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">密碼</label><input type="password" name="password" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-all" placeholder="輸入密碼" value={auth.pass} onChange={e => setAuth({ ...auth, pass: e.target.value })} /></div>
+            <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-600/20 transition-all tracking-widest uppercase mt-4">進入系統</button>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -788,27 +842,65 @@ export const LoginPage = () => {
 
 // --- 6. Sidebar ---
 export const Sidebar = () => {
-  const { config, setIsLoggedIn, showConfirm, shift } = useContext(POSContext);
+  const { config, setCurrentUser, currentUser, showConfirm, shift, hasPermission, roles } = useContext(POSContext);
   const location = useLocation();
+
   const navItems = [
-    { path: '/pos', label: '櫃檯收銀', icon: ShoppingCart },
-    { path: '/orders', label: '訂單管理', icon: ClipboardList },
-    { path: '/settlement', label: '結算作業', icon: Coins },
-    { path: '/admin', label: '店務管理', icon: Edit2 },
-    { path: '/dashboard', label: '報表分析', icon: LayoutDashboard },
-    { path: '/database', label: '原始數據', icon: Database },
-    { path: '/settings', label: '系統設定', icon: Settings },
-  ];
+    { path: '/pos', label: '櫃檯收銀', icon: ShoppingCart, permission: 'ACCESS_POS' },
+    { path: '/orders', label: '訂單管理', icon: ClipboardList, permission: 'ACCESS_ORDERS' },
+    { path: '/settlement', label: '結算作業', icon: Coins, permission: 'ACCESS_SETTLEMENT' },
+    { path: '/admin', label: '店務管理', icon: Edit2, permission: 'ACCESS_ADMIN' },
+    { path: '/staff', label: '員工與權限', icon: Users, permission: 'ACCESS_STAFF' }, // 新增專屬分頁
+    { path: '/dashboard', label: '報表分析', icon: LayoutDashboard, permission: 'ACCESS_DASHBOARD' },
+    { path: '/database', label: '原始數據', icon: Database, permission: 'ACCESS_DATABASE' },
+    { path: '/settings', label: '系統設定', icon: Settings, permission: 'ACCESS_SETTINGS' },
+  ].filter(item => hasPermission(item.permission));
+
+  const roleColors = {
+    developer: 'bg-purple-100 text-purple-700 border-purple-200',
+    manager: 'bg-blue-100 text-blue-700 border-blue-200',
+    staff: 'bg-slate-100 text-slate-600 border-slate-200'
+  };
+
+  const userRoleName = roles.find(r => r.id === currentUser?.roleId)?.name || '未知身分';
+
   return (
     <div className="w-64 h-screen bg-slate-900 text-white fixed left-0 top-0 flex flex-col border-r border-slate-800 z-50 font-sans">
-      <div className="p-8 flex items-center space-x-3 border-b border-slate-800">
+      <div className="p-8 pb-6 flex items-center space-x-3 border-b border-slate-800 shrink-0">
         <div className="bg-blue-600 p-2 rounded-lg shadow-lg"><Store size={24} /></div>
         <span className="text-xl font-black uppercase truncate">{config?.storeName}</span>
       </div>
-      <div className="px-6 py-4"><div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${shift.isOpen ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}><div className={`w-2 h-2 rounded-full animate-pulse ${shift.isOpen ? 'bg-green-400' : 'bg-red-400'}`} /><span className="text-xs font-black uppercase tracking-wider">{shift.isOpen ? '營業中' : '休息中'}</span></div></div>
-      <div className="flex-1 px-4 space-y-2 mt-2 overflow-y-auto scrollbar-hide">{navItems.map(item => (<Link key={item.path} to={item.path} className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${location.pathname === item.path ? 'bg-blue-600 text-white shadow-lg font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><item.icon size={20} /><span className="font-medium">{item.label}</span></Link>))}</div>
-      <button onClick={() => showConfirm('安全登出', '確定要登出？', () => setIsLoggedIn(false))} className="m-6 p-4 flex items-center space-x-3 text-slate-500 hover:text-red-400 border-t border-slate-800 font-bold transition-colors shrink-0">
-        <LogOut size={20} /><span>安全登出</span>
+
+      {/* 登入者身分區塊 */}
+      <div className="px-6 py-5 border-b border-slate-800/50 shrink-0 bg-slate-800/20">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-black shrink-0 border border-slate-600">
+            {currentUser?.name?.charAt(0) || 'U'}
+          </div>
+          <div className="min-w-0">
+            <div className="font-bold text-sm truncate">{currentUser?.name}</div>
+            <div className={`text-[10px] px-2 py-0.5 mt-1 rounded uppercase font-black tracking-widest border inline-block ${roleColors[currentUser?.roleId] || 'bg-slate-100 text-slate-600'}`}>
+              {userRoleName}
+            </div>
+          </div>
+        </div>
+        <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${shift.isOpen ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+          <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${shift.isOpen ? 'bg-green-400' : 'bg-red-400'}`} />
+          <span className="text-[10px] font-black uppercase tracking-wider">{shift.isOpen ? '營業中' : '休息中'}</span>
+        </div>
+      </div>
+
+      <div className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto scrollbar-hide">
+        {navItems.map(item => (
+          <Link key={item.path} to={item.path} className={`flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all ${location.pathname === item.path ? 'bg-blue-600 text-white shadow-lg font-bold' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+            <item.icon size={18} />
+            <span className="font-medium text-sm">{item.label}</span>
+          </Link>
+        ))}
+      </div>
+
+      <button onClick={() => showConfirm('安全登出', '確定要登出並返回登入畫面？', () => setCurrentUser(null))} className="m-6 p-4 flex items-center justify-center space-x-2 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-2xl font-bold transition-all shrink-0 border border-slate-700 hover:border-red-500/30">
+        <LogOut size={16} /><span>登出系統</span>
       </button>
     </div>
   );
@@ -816,7 +908,7 @@ export const Sidebar = () => {
 
 // --- 7. POSPage ---
 export const POSPage = () => {
-  const { menu, setOrders, orders, config, shift, openShift, showConfirm } = useContext(POSContext);
+  const { menu, setOrders, orders, config, shift, openShift, showConfirm, currentUser, showAlert, hasPermission } = useContext(POSContext);
   const [cart, setCart] = useState([]);
   const [orderType, setOrderType] = useState('dineIn');
   const [searchTerm, setSearchTerm] = useState('');
@@ -859,11 +951,7 @@ export const POSPage = () => {
         }
       }
 
-      const newItem = {
-        ...configuredItem,
-        quantity: qtyToApply
-      };
-
+      const newItem = { ...configuredItem, quantity: qtyToApply };
       return getUpdatedCart(currentCart, newItem);
     });
   };
@@ -906,7 +994,29 @@ export const POSPage = () => {
     else handleFinalize();
   };
 
-  if (!shift.isOpen) return (<div className="h-full flex items-center justify-center font-sans"><div className="bg-white p-16 rounded-[3rem] shadow-2xl text-center max-w-lg border border-slate-100 animate-in fade-in zoom-in-95"><div className="bg-blue-50 w-24 h-24 rounded-[2rem] flex items-center justify-center text-blue-600 mx-auto mb-8 shadow-inner"><Lock size={48} /></div><h2 className="text-3xl font-black text-slate-800 mb-4">班次尚未開啟</h2><p className="text-slate-400 mb-10 leading-relaxed font-medium">系統目前處於「休息結帳」狀態，請先啟動今日班次以開始作業。</p><button onClick={() => showConfirm('開始營業', '確定要開啟今日班次嗎？', openShift)} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 flex items-center justify-center gap-3 transition-all"><Play size={24} /> 啟動今日開帳</button></div></div>);
+  if (!shift.isOpen) {
+    return (
+      <div className="h-full flex items-center justify-center font-sans">
+        <div className="bg-white p-16 rounded-[3rem] shadow-2xl text-center max-w-lg border border-slate-100 animate-in fade-in zoom-in-95">
+          <div className="bg-blue-50 w-24 h-24 rounded-[2rem] flex items-center justify-center text-blue-600 mx-auto mb-8 shadow-inner"><Lock size={48} /></div>
+          <h2 className="text-3xl font-black text-slate-800 mb-4">班次尚未開啟</h2>
+          <p className="text-slate-400 mb-10 leading-relaxed font-medium">系統目前處於「休息結帳」狀態，請先啟動今日班次以開始作業。</p>
+          <button
+            onClick={() => {
+              if (!hasPermission('ACCESS_SETTLEMENT') && !hasPermission('ACCESS_ADMIN')) {
+                showAlert('權限不足', '只有具備管理權限的主管可以進行開帳作業。', 'danger');
+                return;
+              }
+              showConfirm('開始營業', '確定要開啟今日班次嗎？', openShift);
+            }}
+            className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 flex items-center justify-center gap-3 transition-all"
+          >
+            <Play size={24} /> 啟動今日開帳
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 h-full overflow-hidden text-slate-900 font-sans">
@@ -970,7 +1080,7 @@ export const POSPage = () => {
 
 // --- 8. OrderManagementPage ---
 export const OrderManagementPage = () => {
-  const { orders, setOrders, shift, showAlert } = useContext(POSContext);
+  const { orders, setOrders, shift, showAlert, hasPermission } = useContext(POSContext);
   const [expandedId, setExpandedId] = useState(null);
   const [activePayOrder, setActivePayOrder] = useState(null);
   const [voidId, setVoidId] = useState(null);
@@ -978,7 +1088,22 @@ export const OrderManagementPage = () => {
 
   const pending = orders.filter(o => o.status === 'unclosed' && o.paymentStatus === 'pending' && !o.isVoided);
   const history = orders.filter(o => o.status === 'unclosed' && (o.paymentStatus === 'paid' || o.isVoided));
-  const handleActionClick = (actionFn) => { if (!shift.isOpen) { showAlert('操作鎖定', '目前班次已結清休息中，無法修改。', 'danger'); return; } actionFn(); };
+
+  const handleActionClick = (actionFn) => {
+    if (!shift.isOpen) {
+      showAlert('操作鎖定', '目前班次已結清休息中，無法修改。', 'danger');
+      return;
+    }
+    actionFn();
+  };
+
+  const handleVoidClick = (orderId) => {
+    if (!hasPermission('VOID_ORDERS')) {
+      showAlert('權限不足', '您的帳號不具備「作廢訂單」的權限，請聯絡店舖主管。', 'danger');
+      return;
+    }
+    handleActionClick(() => setVoidId(orderId));
+  };
 
   return (
     <div className="max-w-6xl h-full flex flex-col overflow-hidden text-slate-900 font-sans">
@@ -1017,7 +1142,7 @@ export const OrderManagementPage = () => {
                     <div className="text-xs text-slate-400 flex items-center gap-1 font-mono tracking-tight"><Clock size={12} />{o.date} {o.time}</div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={20} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleVoidClick(o.id); }} className={`p-2 transition-colors ${!hasPermission('VOID_ORDERS') ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-red-500'}`}><RotateCcw size={20} /></button>
                     <div className="text-right mx-2 font-sans"><p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">金額</p><p className="text-2xl font-black text-slate-800 font-mono">${o.total}</p></div>
                     <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setActivePayOrder(o)); }} className={`bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-lg hover:bg-blue-600 transition-all text-sm uppercase ${!shift.isOpen ? 'opacity-30' : ''}`}>前往付款 PAY</button>
                   </div>
@@ -1063,7 +1188,7 @@ export const OrderManagementPage = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-5">
-                    {!o.isVoided && <button onClick={(e) => { e.stopPropagation(); handleActionClick(() => setVoidId(o.id)); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><RotateCcw size={18} /></button>}
+                    {!o.isVoided && <button onClick={(e) => { e.stopPropagation(); handleVoidClick(o.id); }} className={`p-2 transition-colors ${!hasPermission('VOID_ORDERS') ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-red-500'}`}><RotateCcw size={18} /></button>}
                     <div className="text-right font-sans">
                       <div className={`text-xl font-black font-mono font-mono font-mono ${o.isVoided ? 'text-slate-400' : 'text-slate-800'}`}>${o.total}</div>
                       <div className={`text-[10px] font-black uppercase tracking-widest ${o.isVoided ? 'text-red-500' : 'text-blue-400'}`}>{o.isVoided ? 'VOID' : (o.paymentMethod || 'PAID')}</div>
@@ -1106,7 +1231,7 @@ export const OrderManagementPage = () => {
   );
 };
 
-// --- 9. AdminPage ---
+// --- 9. AdminPage (移除使用者管理) ---
 export const AdminPage = () => {
   const { menu, setMenu, discountRules, setDiscountRules, showConfirm, modifierTemplates, setModifierTemplates } = useContext(POSContext);
   const [tab, setTab] = useState('menu');
@@ -1235,7 +1360,7 @@ export const AdminPage = () => {
       </div>
 
       {tab === 'menu' && (
-        <div className="flex gap-6 h-full overflow-hidden">
+        <div className="flex-1 min-h-0 flex gap-6 overflow-hidden">
           <div className="w-1/3 overflow-y-auto pr-2 scrollbar-thin space-y-3 pb-20">
             {menu.map((i) => (
               <div key={i.id} className={`bg-white p-4 rounded-2xl border flex flex-col gap-2 shadow-sm transition-all cursor-pointer ${editId === i.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-100 hover:border-blue-200'}`} onClick={() => loadEditItem(i)}>
@@ -1344,7 +1469,7 @@ export const AdminPage = () => {
       )}
 
       {tab === 'modules' && (
-        <div className="flex gap-6 h-full">
+        <div className="flex-1 min-h-0 flex gap-6">
           <div className="w-1/3 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-fit">
             <h3 className="font-bold text-lg mb-4">{editingTemplateId ? '編輯模組' : '建立新模組'}</h3>
             <form onSubmit={handleTemplateSubmit} className="space-y-4">
@@ -1388,7 +1513,7 @@ export const AdminPage = () => {
       )}
 
       {tab === 'discount' && (
-        <div className="h-full flex gap-6">
+        <div className="flex-1 min-h-0 flex gap-6">
           <form onSubmit={handleDiscountSubmit} className="w-1/3 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-fit">
             <h3 className="font-bold text-lg mb-4">{editingDiscountId ? '編輯優惠' : '新增優惠'}</h3>
             <div className="space-y-4">
@@ -1440,7 +1565,276 @@ export const AdminPage = () => {
   );
 };
 
-// --- 10. SettlementPage (修正日期格式與標籤) ---
+// --- 新增：14. StaffManagementPage (獨立的員工與權限管理頁面) ---
+export const StaffManagementPage = () => {
+  // 取得 currentUser 以判斷是否為開發者
+  const { users, setUsers, roles, setRoles, showAlert, showConfirm, currentUser } = useContext(POSContext);
+  const [tab, setTab] = useState('users');
+
+  // 使用者表單狀態
+  const [newUser, setNewUser] = useState({ username: '', password: '', name: '', roleId: 'staff' });
+  const [editingUserId, setEditingUserId] = useState(null);
+
+  // 角色表單狀態
+  const [newRole, setNewRole] = useState({ name: '', permissions: [] });
+  const [editingRoleId, setEditingRoleId] = useState(null);
+
+  const handleUserSubmit = (e) => {
+    e.preventDefault();
+    if (!newUser.username || !newUser.password || !newUser.name || !newUser.roleId) {
+      showAlert('資料不完整', '請填寫所有必填欄位', 'danger');
+      return;
+    }
+
+    if (editingUserId) {
+      if (users.find(u => u.username === newUser.username && u.id !== editingUserId)) {
+        showAlert('帳號重複', '此帳號已被其他員工使用，請更換一個', 'danger');
+        return;
+      }
+      setUsers(users.map(u => u.id === editingUserId ? { ...u, ...newUser } : u));
+      setEditingUserId(null);
+      setNewUser({ username: '', password: '', name: '', roleId: 'staff' });
+      showAlert('更新成功', '員工帳號已成功更新', 'success');
+    } else {
+      if (users.find(u => u.username === newUser.username)) {
+        showAlert('帳號重複', '此帳號已存在，請更換一個', 'danger');
+        return;
+      }
+      setUsers([...users, { id: Date.now(), ...newUser }]);
+      setNewUser({ username: '', password: '', name: '', roleId: 'staff' });
+      showAlert('新增成功', '新員工帳號已建立', 'success');
+    }
+  };
+
+  const handleEditUser = (user) => {
+    setNewUser({
+      username: user.username,
+      password: user.password,
+      name: user.name,
+      roleId: user.roleId
+    });
+    setEditingUserId(user.id);
+  };
+
+  const handleRoleSubmit = (e) => {
+    e.preventDefault();
+    if (!newRole.name || newRole.permissions.length === 0) {
+      showAlert('資料不完整', '請輸入角色名稱，並至少勾選一項權限', 'danger');
+      return;
+    }
+
+    if (editingRoleId) {
+      setRoles(roles.map(r => r.id === editingRoleId ? { ...r, name: newRole.name, permissions: newRole.permissions } : r));
+      setEditingRoleId(null);
+      setNewRole({ name: '', permissions: [] });
+      showAlert('更新成功', '自訂角色與權限已成功更新', 'success');
+    } else {
+      setRoles([...roles, { id: Date.now().toString(), name: newRole.name, permissions: newRole.permissions }]);
+      setNewRole({ name: '', permissions: [] });
+      showAlert('新增成功', '自訂角色與權限已建立', 'success');
+    }
+  };
+
+  const handleEditRole = (role) => {
+    setNewRole({
+      name: role.name,
+      permissions: role.permissions
+    });
+    setEditingRoleId(role.id);
+  };
+
+  const handleDeleteRole = (roleId) => {
+    if (['developer', 'manager', 'staff'].includes(roleId)) {
+      showAlert('操作拒絕', '系統預設的核心角色無法刪除', 'danger');
+      return;
+    }
+    if (users.some(u => u.roleId === roleId)) {
+      showAlert('操作拒絕', '尚有員工綁定此角色，請先將相關員工變更為其他角色後再刪除。', 'danger');
+      return;
+    }
+    showConfirm('刪除角色', '確定要刪除此角色嗎？這將無法復原。', () => {
+      setRoles(roles.filter(r => r.id !== roleId));
+      if (editingRoleId === roleId) {
+        setEditingRoleId(null);
+        setNewRole({ name: '', permissions: [] });
+      }
+    }, 'danger');
+  };
+
+  const togglePermission = (permKey) => {
+    setNewRole(prev => {
+      const hasPerm = prev.permissions.includes(permKey);
+      if (hasPerm) {
+        return { ...prev, permissions: prev.permissions.filter(p => p !== permKey) };
+      } else {
+        return { ...prev, permissions: [...prev.permissions, permKey] };
+      }
+    });
+  };
+
+  return (
+    <div className="max-w-5xl h-full flex flex-col overflow-hidden text-slate-900 font-sans">
+      <div className="flex justify-between items-center mb-6 shrink-0">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">員工與權限管理</h2>
+          <p className="text-slate-400 font-medium text-sm mt-1">管理系統操作人員與自訂角色存取層級</p>
+        </div>
+        <div className="bg-slate-100 p-1.5 rounded-2xl flex font-bold border border-slate-200 shadow-inner">
+          <button onClick={() => { setTab('users'); setEditingUserId(null); setNewUser({ username: '', password: '', name: '', roleId: 'staff' }); }} className={`px-6 py-2 rounded-xl text-sm transition-all flex items-center gap-2 ${tab === 'users' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}><UserPlus size={16} /> 員工帳號</button>
+          <button onClick={() => { setTab('roles'); setEditingRoleId(null); setNewRole({ name: '', permissions: [] }); }} className={`px-6 py-2 rounded-xl text-sm transition-all flex items-center gap-2 ${tab === 'roles' ? 'bg-white text-blue-600 shadow-md ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}><ShieldCheck size={16} /> 權限角色</button>
+        </div>
+      </div>
+
+      {tab === 'users' && (
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 overflow-y-auto lg:overflow-visible pb-4 lg:pb-4">
+          <form onSubmit={handleUserSubmit} className="lg:w-1/3 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm h-fit shrink-0 transition-all mb-4 lg:mb-0">
+            <h3 className="font-black text-xl mb-6 text-slate-800 border-b border-slate-100 pb-4">{editingUserId ? '編輯員工帳號' : '建立新員工帳號'}</h3>
+            <div className="space-y-5">
+              <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1.5">員工姓名 / 暱稱</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium" placeholder="例如：王小明" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} /></div>
+              <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1.5">登入帳號 (Username)</label><input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-mono transition-all" placeholder="例如：ming123" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} /></div>
+              <div><label className="text-xs font-bold text-slate-400 uppercase block mb-1.5">登入密碼</label><input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-mono transition-all" placeholder="設定登入密碼" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} /></div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5">指派存取角色</label>
+                <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none cursor-pointer font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all" value={newUser.roleId} onChange={e => setNewUser({ ...newUser, roleId: e.target.value })}>
+                  <option value="" disabled>請選擇一個角色...</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                {editingUserId && (
+                  <button type="button" onClick={() => { setEditingUserId(null); setNewUser({ username: '', password: '', name: '', roleId: 'staff' }); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">取消</button>
+                )}
+                <button type="submit" className={`flex-[2] py-4 text-white rounded-xl font-black text-lg shadow-xl hover:shadow-lg active:scale-95 transition-all ${editingUserId ? 'bg-green-600 shadow-green-600/20 hover:bg-green-700' : 'bg-blue-600 shadow-blue-600/20 hover:bg-blue-700'}`}>{editingUserId ? '儲存變更' : '建立帳號'}</button>
+              </div>
+            </div>
+          </form>
+          <div className="flex-1 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col min-h-[400px] lg:min-h-0">
+            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center"><h3 className="font-bold text-lg text-slate-800">系統員工列表</h3><span className="bg-slate-200 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{users.length} 個帳號</span></div>
+            <div className="flex-1 overflow-y-auto p-6 pb-20 space-y-3 scrollbar-thin">
+              {users.map(u => {
+                const role = roles.find(r => r.id === u.roleId);
+                const isSystemAcc = u.roleId === 'developer';
+                const isEditingThis = editingUserId === u.id;
+                return (
+                  <div key={u.id} className={`p-4 rounded-2xl border flex justify-between items-center transition-all ${isEditingThis ? 'border-green-500 ring-2 ring-green-100 bg-green-50/20' : isSystemAcc ? 'bg-purple-50/30 border-purple-100' : 'bg-white border-slate-100 hover:border-blue-200 shadow-sm'}`}>
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg border ${isEditingThis ? 'bg-green-100 text-green-600 border-green-200' : isSystemAcc ? 'bg-purple-100 text-purple-600 border-purple-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{u.name.charAt(0)}</div>
+                      <div>
+                        <div className="font-bold text-slate-800 flex items-center gap-2 text-lg">{u.name} <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-mono">{u.username}</span></div>
+                        <div className={`text-xs mt-1.5 flex items-center gap-1.5 font-bold ${isSystemAcc ? 'text-purple-500' : 'text-slate-500'}`}><Shield size={14} /> {role?.name || '未知角色'}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 md:gap-4">
+                      <div className="text-right mr-2 hidden md:block">
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">登入密碼</div>
+                        <div className="font-mono text-sm text-slate-600">{u.password}</div>
+                      </div>
+                      <button onClick={() => handleEditUser(u)} className={`p-2.5 rounded-xl transition-all text-blue-400 hover:text-blue-600 hover:bg-blue-50`} title="編輯帳號"><Edit2 size={20} /></button>
+                      <button onClick={() => {
+                        if (isSystemAcc) { showAlert('操作拒絕', '系統核心開發者帳號無法刪除，以防系統失聯。', 'danger'); return; }
+                        showConfirm('刪除帳號', `確定要刪除員工「${u.name}」的帳號嗎？`, () => setUsers(users.filter(user => user.id !== u.id)), 'danger');
+                      }} className={`p-2.5 rounded-xl transition-all ${isSystemAcc ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`} title="刪除帳號"><Trash2 size={20} /></button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'roles' && (
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 overflow-y-auto lg:overflow-visible pb-4 lg:pb-4">
+          <form onSubmit={handleRoleSubmit} className="lg:w-[40%] bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col h-auto lg:h-full shrink-0 transition-all mb-4 lg:mb-0">
+            <h3 className="font-black text-xl mb-6 text-slate-800 border-b border-slate-100 pb-4">{editingRoleId ? '編輯自訂角色' : '自訂新角色'}</h3>
+            <div className="mb-6 shrink-0">
+              <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5">角色名稱</label>
+              <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-lg text-slate-700" placeholder="例如：計時人員" value={newRole.name} onChange={e => setNewRole({ ...newRole, name: e.target.value })} />
+            </div>
+
+            <div className="flex-1 min-h-0 flex flex-col">
+              <label className="text-xs font-bold text-slate-400 uppercase block mb-2 shrink-0">指派權限 (Permissions)</label>
+              <div className="flex-1 overflow-y-auto pr-2 pb-6 space-y-2 scrollbar-thin">
+                {Object.entries(PERMISSIONS).map(([key, label]) => {
+                  const isSelected = newRole.permissions.includes(key);
+                  return (
+                    <div key={key} onClick={() => togglePermission(key)} className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex justify-between items-center ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-100 bg-white text-slate-500 hover:border-blue-200'}`}>
+                      <span className="font-bold text-sm">{label}</span>
+                      {isSelected && <CheckCircle2 size={18} className="text-blue-500" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-6 shrink-0 border-t border-slate-100">
+              {editingRoleId && (
+                <button type="button" onClick={() => { setEditingRoleId(null); setNewRole({ name: '', permissions: [] }); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">取消</button>
+              )}
+              {/* 新增：開發者專屬的「還原預設」按鈕 */}
+              {editingRoleId && ['developer', 'manager', 'staff'].includes(editingRoleId) && currentUser?.roleId === 'developer' && (
+                <button type="button" onClick={() => {
+                  const defaultRole = DEFAULT_ROLES.find(r => r.id === editingRoleId);
+                  if (defaultRole) {
+                    setNewRole({ name: defaultRole.name, permissions: defaultRole.permissions });
+                    showAlert('已載入預設值', '請點擊「儲存角色變更」來正式套用預設權限。', 'info');
+                  }
+                }} className="flex-1 py-4 bg-orange-100 text-orange-600 rounded-xl font-bold hover:bg-orange-200 transition-all">還原預設</button>
+              )}
+              <button type="submit" className={`flex-[2] py-4 text-white rounded-xl font-black text-lg shadow-xl active:scale-95 transition-all ${editingRoleId ? 'bg-green-600 shadow-green-600/20 hover:bg-green-700' : 'bg-slate-900 shadow-slate-900/20 hover:bg-slate-800'}`}>{editingRoleId ? '儲存角色變更' : '建立新角色'}</button>
+            </div>
+          </form>
+
+          <div className="flex-1 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col min-h-[400px] lg:min-h-0">
+            <div className="p-6 border-b border-slate-100 bg-slate-50/50"><h3 className="font-bold text-lg text-slate-800">現有角色與權限架構</h3></div>
+            <div className="flex-1 overflow-y-auto p-6 pb-20 space-y-4 scrollbar-thin">
+              {roles.map(r => {
+                const isSystemRole = ['developer', 'manager', 'staff'].includes(r.id);
+                const assignedUsersCount = users.filter(u => u.roleId === r.id).length;
+                const isEditingThis = editingRoleId === r.id;
+                return (
+                  <div key={r.id} className={`p-5 rounded-2xl border flex flex-col gap-3 relative overflow-hidden group transition-all ${isEditingThis ? 'border-green-500 ring-2 ring-green-100 bg-green-50/20' : 'border-slate-200 shadow-sm hover:border-blue-300 bg-white'}`}>
+                    {isSystemRole && <div className="absolute top-0 right-0 bg-slate-100 text-slate-400 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-lg">System Default</div>}
+                    <div className="flex justify-between items-center mt-1">
+                      <div className="flex items-center gap-3">
+                        <h4 className={`text-xl font-black ${isSystemRole ? 'text-slate-800' : 'text-blue-700'}`}>{r.name}</h4>
+                        <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded font-bold">{assignedUsersCount} 名員工</span>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* 修改：允許開發者編輯系統預設角色 */}
+                        <button onClick={() => {
+                          if (isSystemRole && currentUser?.roleId !== 'developer') {
+                            showAlert('系統保護', '系統預設角色僅供檢視，無法修改權限配置。請聯絡開發者或建立新角色。', 'info');
+                          } else {
+                            handleEditRole(r);
+                          }
+                        }} className={`p-2 rounded-lg transition-all ${(isSystemRole && currentUser?.roleId !== 'developer') ? 'text-slate-300 cursor-not-allowed' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`} title="編輯角色"><Edit2 size={18} /></button>
+                        <button onClick={() => handleDeleteRole(r.id)} disabled={isSystemRole} className={`p-2 rounded-lg transition-all ${isSystemRole ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`} title="刪除角色"><Trash2 size={18} /></button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-50">
+                      {r.permissions.map(pKey => (
+                        <span key={pKey} className="text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-1 rounded-md font-bold tracking-wide">
+                          {PERMISSIONS[pKey] || pKey}
+                        </span>
+                      ))}
+                      {r.permissions.length === 0 && <span className="text-xs text-red-400 italic">尚未指派任何權限</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+// --- 10. SettlementPage ---
 export const SettlementPage = () => {
   const { orders, dailySummaries, setDailySummaries, setOrders, showAlert, showConfirm, shift, setShift } = useContext(POSContext);
   const [expandOrderId, setExpandOrderId] = useState(null);
@@ -2258,7 +2652,6 @@ export const SettingsPage = () => {
 
         <hr className="border-slate-100" />
 
-        {/* 新增：硬體與輸入設定 */}
         <section className="space-y-8 font-sans">
           <h4 className="font-bold text-lg text-slate-700 flex items-center gap-2 px-1 font-black uppercase tracking-tight"><Box size={20} className="text-blue-500" /> 硬體與輸入設定</h4>
           <div className="space-y-4">
@@ -2285,32 +2678,40 @@ export const SettingsPage = () => {
   );
 };
 
-// --- 14. 主結構入口 ---
-const MainLayout = () => (
-  <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden relative">
-    <Sidebar />
-    <main className="flex-1 ml-64 p-12 h-screen overflow-y-auto relative scroll-smooth">
-      <ErrorBoundary>
-        <Routes>
-          <Route path="/pos" element={<POSPage />} />
-          <Route path="/orders" element={<OrderManagementPage />} />
-          <Route path="/settlement" element={<SettlementPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/database" element={<DatabaseViewPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/pos" replace />} />
-        </Routes>
-      </ErrorBoundary>
-      <GlobalModal />
-      <GlobalNumpad /> {/* 放入全域 Numpad 元件 */}
-    </main>
-  </div>
-);
+// --- 14. 主結構入口 (Route Protection) ---
+const MainLayout = () => {
+  const { hasPermission } = useContext(POSContext);
+
+  return (
+    <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden relative">
+      <Sidebar />
+      <main className="flex-1 ml-64 p-12 h-screen overflow-y-auto relative scroll-smooth">
+        <ErrorBoundary>
+          <Routes>
+            {hasPermission('ACCESS_POS') && <Route path="/pos" element={<POSPage />} />}
+            {hasPermission('ACCESS_ORDERS') && <Route path="/orders" element={<OrderManagementPage />} />}
+            {hasPermission('ACCESS_SETTLEMENT') && <Route path="/settlement" element={<SettlementPage />} />}
+            {hasPermission('ACCESS_ADMIN') && <Route path="/admin" element={<AdminPage />} />}
+            {hasPermission('ACCESS_STAFF') && <Route path="/staff" element={<StaffManagementPage />} />}
+            {hasPermission('ACCESS_DASHBOARD') && <Route path="/dashboard" element={<DashboardPage />} />}
+            {hasPermission('ACCESS_DATABASE') && <Route path="/database" element={<DatabaseViewPage />} />}
+            {hasPermission('ACCESS_SETTINGS') && <Route path="/settings" element={<SettingsPage />} />}
+
+            {/* 阻擋無權限網址，統一導回有權限的第一個頁面，預設為收銀 */}
+            <Route path="*" element={<Navigate to={hasPermission('ACCESS_POS') ? "/pos" : "/orders"} replace />} />
+          </Routes>
+        </ErrorBoundary>
+        <GlobalModal />
+        <GlobalNumpad />
+      </main>
+    </div>
+  );
+};
 
 const AppContent = () => {
-  const { isLoggedIn } = useContext(POSContext);
-  return isLoggedIn ? <MainLayout /> : (
+  const { currentUser } = useContext(POSContext);
+  // 改為判斷是否有 currentUser
+  return currentUser ? <MainLayout /> : (
     <>
       <LoginPage />
       <GlobalModal />
