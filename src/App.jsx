@@ -8,8 +8,9 @@ import {
   ShieldCheck, RotateCcw, AlertTriangle, Save, Ticket, Eye, EyeOff,
   Receipt, Database, Copy, Code, ChevronLeft, Users, UserPlus, Shield,
   ChevronsLeft, ChevronsRight, ListFilter, Info, FilterX, Play,
-  StopCircle, Lock, Coins, Layers, Check, Box, Bug, CheckCircle2, Hash, Fingerprint, Keyboard
+  StopCircle, Lock, Coins, Layers, Check, Box, Bug, CheckCircle2, Hash, Fingerprint, Keyboard, ToggleLeft, ToggleRight, Wrench
 } from 'lucide-react';
+import Dexie from 'https://esm.sh/dexie';
 
 // --- Helpers: 統一日期與時間格式 ---
 const getTodayDate = () => {
@@ -32,17 +33,18 @@ const getCurrentDateTime = () => {
   return `${getTodayDate()} ${getCurrentTime()}`;
 };
 
-// --- 使用者權限設定 (加入新的 ACCESS_STAFF) ---
+// --- 預設系統資料 (Default Data Constants) ---
 export const PERMISSIONS = {
   ACCESS_POS: '櫃檯收銀',
   ACCESS_ORDERS: '訂單管理',
   VOID_ORDERS: '作廢訂單',
   ACCESS_SETTLEMENT: '結算作業',
   ACCESS_ADMIN: '店務管理',
-  ACCESS_STAFF: '員工權限管理', // 新增權限
+  ACCESS_STAFF: '員工權限管理',
   ACCESS_DASHBOARD: '報表分析',
   ACCESS_SETTINGS: '系統設定',
-  ACCESS_DATABASE: '原始數據(開發者)'
+  ACCESS_DATABASE: '原始數據(開發者)',
+  ACCESS_DEVTOOLS: '開發者工具(開發者)' // 新增：開發者專屬工具頁面權限
 };
 
 const DEFAULT_ROLES = [
@@ -56,6 +58,117 @@ const DEFAULT_USERS = [
   { id: 2, username: 'admin', password: '123', name: '店長', roleId: 'manager' },
   { id: 3, username: 'staff', password: '123', name: '櫃檯人員', roleId: 'staff' },
 ];
+
+const DEFAULT_MENU = [
+  { id: 1, name: '招牌美式', price: 65, category: '咖啡', isAvailable: true },
+  { id: 2, name: '經典拿鐵', price: 85, category: '咖啡', isAvailable: true },
+  { id: 3, name: '大吉嶺紅茶', price: 50, category: '茶飲', isAvailable: true },
+  { id: 4, name: '起司蛋糕', price: 95, category: '甜點', isAvailable: true }
+];
+
+const DEFAULT_TEMPLATES = [
+  { id: 't1', name: '尺寸 (Size)', options: ['大杯', '中杯'] },
+  { id: 't2', name: '冰塊 (Ice)', options: ['正常冰', '少冰', '微冰', '去冰', '溫', '熱'] },
+  { id: 't3', name: '甜度 (Sugar)', options: ['正常糖', '半糖', '微糖', '無糖'] },
+  { id: 't4', name: '加料 (Toppings)', options: ['珍珠', '椰果'] }
+];
+
+const DEFAULT_DISCOUNTS = [
+  { id: 1, name: '9折優惠', type: 'percentage', value: 0.9 },
+  { id: 2, name: '8折優惠', type: 'percentage', value: 0.8 },
+  { id: 3, name: '現折 $10', type: 'amount', value: 10 }
+];
+
+const DEFAULT_CONFIG = {
+  dineInMode: 'prePay', storeName: 'Smart POS', enableCreditCard: true, enableMobilePayment: true, enableVirtualNumpad: false
+};
+
+const DEFAULT_SHIFT = { isOpen: false, businessDate: null, openedAt: null };
+
+// --- Dexie.js (IndexedDB) 初始化 ---
+export const db = new Dexie('SmartPOSDB');
+db.version(1).stores({
+  pos_menu: 'id, category, isAvailable',
+  pos_orders: 'id, orderNo, date, status, paymentStatus',
+  pos_daily_summaries: 'id, date',
+  pos_users: 'id, username, roleId',
+  pos_roles: 'id',
+  pos_discounts: 'id',
+  pos_templates: 'id',
+  pos_keyvalue: 'key' // 用於儲存 config, shift, current_user 這種非陣列的單一物件
+});
+
+// --- API 服務層 (API Service Layer) ---
+export const apiService = {
+  // 取得目前的開發者模式設定 (true = localStorage, false = IndexedDB)
+  isLocalMode: () => {
+    const val = localStorage.getItem('DEV_USE_LS');
+    return val !== 'false'; // 預設系統採用 LocalStorage (相容舊版本)
+  },
+
+  setLocalMode: (useLS) => {
+    localStorage.setItem('DEV_USE_LS', useLS ? 'true' : 'false');
+  },
+
+  // Helper: 讀取 Array 資料表
+  getArray: async (tableName, defaultVal) => {
+    if (apiService.isLocalMode()) {
+      try {
+        const val = localStorage.getItem(tableName);
+        return val ? JSON.parse(val) : defaultVal;
+      } catch { return defaultVal; }
+    } else {
+      try {
+        const data = await db[tableName].toArray();
+        return data.length > 0 ? data : defaultVal;
+      } catch (e) { console.error(`[DB] Read error ${tableName}:`, e); return defaultVal; }
+    }
+  },
+
+  // Helper: 寫入 Array 資料表 (整包覆蓋)
+  saveArray: async (tableName, dataArray) => {
+    if (apiService.isLocalMode()) {
+      localStorage.setItem(tableName, JSON.stringify(dataArray));
+    } else {
+      try {
+        // 使用 Transaction 確保整包寫入時的資料一致性
+        await db.transaction('rw', db[tableName], async () => {
+          await db[tableName].clear();
+          if (dataArray && dataArray.length > 0) {
+            await db[tableName].bulkAdd(dataArray);
+          }
+        });
+      } catch (e) { console.error(`[DB] Save error ${tableName}:`, e); }
+    }
+  },
+
+  // Helper: 讀取單一 Object (KV Storage)
+  getObject: async (key, defaultVal) => {
+    if (apiService.isLocalMode()) {
+      try {
+        const val = localStorage.getItem(key);
+        return val && val !== "undefined" && val !== "null" ? JSON.parse(val) : defaultVal;
+      } catch { return defaultVal; }
+    } else {
+      try {
+        const record = await db.pos_keyvalue.get(key);
+        return record ? record.value : defaultVal;
+      } catch (e) { return defaultVal; }
+    }
+  },
+
+  // Helper: 寫入單一 Object
+  saveObject: async (key, dataObj) => {
+    if (apiService.isLocalMode()) {
+      localStorage.setItem(key, JSON.stringify(dataObj));
+    } else {
+      try {
+        await db.pos_keyvalue.put({ key, value: dataObj });
+      } catch (e) { console.error(`[DB] Save error ${key}:`, e); }
+    }
+  }
+};
+
 
 // --- DEBUG: Error Boundary ---
 class ErrorBoundary extends React.Component {
@@ -150,62 +263,48 @@ const getUpdatedCart = (prevCart, newItem) => {
 export const POSContext = createContext();
 
 export const POSProvider = ({ children }) => {
-  const safeJsonParse = (key, defaultValue) => {
-    try {
-      const saved = localStorage.getItem(key);
-      if (!saved || saved === "undefined" || saved === "null") return defaultValue;
+  // 新增：確保資料庫已經載入完成
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(defaultValue) && !Array.isArray(parsed)) {
-        return defaultValue;
-      }
-      return parsed;
-    } catch (e) {
-      return defaultValue;
-    }
-  };
-
-  const [modifierTemplates, setModifierTemplates] = useState(() => safeJsonParse('pos_templates', [
-    { id: 't1', name: '尺寸 (Size)', options: ['大杯', '中杯'] },
-    { id: 't2', name: '冰塊 (Ice)', options: ['正常冰', '少冰', '微冰', '去冰', '溫', '熱'] },
-    { id: 't3', name: '甜度 (Sugar)', options: ['正常糖', '半糖', '微糖', '無糖'] },
-    { id: 't4', name: '加料 (Toppings)', options: ['珍珠', '椰果'] }
-  ]));
-
-  const [menu, setMenu] = useState(() => safeJsonParse('pos_menu', [
-    { id: 1, name: '招牌美式', price: 65, category: '咖啡', isAvailable: true },
-    { id: 2, name: '經典拿鐵', price: 85, category: '咖啡', isAvailable: true },
-    { id: 3, name: '大吉嶺紅茶', price: 50, category: '茶飲', isAvailable: true },
-    { id: 4, name: '起司蛋糕', price: 95, category: '甜點', isAvailable: true }
-  ]));
-
-  const [orders, setOrders] = useState(() => safeJsonParse('pos_orders', []));
-  const [dailySummaries, setDailySummaries] = useState(() => safeJsonParse('pos_daily_summaries', []));
-  const [discountRules, setDiscountRules] = useState(() => safeJsonParse('pos_discounts', [
-    { id: 1, name: '9折優惠', type: 'percentage', value: 0.9 },
-    { id: 2, name: '8折優惠', type: 'percentage', value: 0.8 },
-    { id: 3, name: '現折 $10', type: 'amount', value: 10 }
-  ]));
-
-  const [config, setConfig] = useState(() => safeJsonParse('pos_config', {
-    dineInMode: 'prePay', storeName: 'Smart POS', enableCreditCard: true, enableMobilePayment: true, enableVirtualNumpad: false
-  }));
-
-  const [users, setUsers] = useState(() => safeJsonParse('pos_users', DEFAULT_USERS));
-  const [roles, setRoles] = useState(() => safeJsonParse('pos_roles', DEFAULT_ROLES));
-
-  // 目前登入的使用者狀態
-  const [currentUser, setCurrentUser] = useState(() => safeJsonParse('pos_current_user', null));
-
-  const [shift, setShift] = useState(() => safeJsonParse('pos_shift', {
-    isOpen: false, businessDate: null, openedAt: null
-  }));
+  // 初始化階段不直接讀取，改為依賴 useEffect 的非同步載入
+  const [modifierTemplates, setModifierTemplates] = useState([]);
+  const [menu, setMenu] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [dailySummaries, setDailySummaries] = useState([]);
+  const [discountRules, setDiscountRules] = useState([]);
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [shift, setShift] = useState(DEFAULT_SHIFT);
 
   const [modal, setModal] = useState({
     isOpen: false, title: '', message: '', type: 'info', onConfirm: null, onCancel: null, confirmText: '確認', cancelText: '取消'
   });
 
   const [numpad, setNumpad] = useState({ isOpen: false, value: '', onConfirm: null, title: '', allowDecimal: true });
+
+  // --- 系統初始化載入 (Async DB Booting) ---
+  useEffect(() => {
+    const bootDatabase = async () => {
+      // 依序從底層資料庫 (LS 或 IndexedDB) 取出資料
+      setModifierTemplates(await apiService.getArray('pos_templates', DEFAULT_TEMPLATES));
+      setMenu(await apiService.getArray('pos_menu', DEFAULT_MENU));
+      setOrders(await apiService.getArray('pos_orders', []));
+      setDailySummaries(await apiService.getArray('pos_daily_summaries', []));
+      setDiscountRules(await apiService.getArray('pos_discounts', DEFAULT_DISCOUNTS));
+      setUsers(await apiService.getArray('pos_users', DEFAULT_USERS));
+      setRoles(await apiService.getArray('pos_roles', DEFAULT_ROLES));
+
+      setConfig(await apiService.getObject('pos_config', DEFAULT_CONFIG));
+      setCurrentUser(await apiService.getObject('pos_current_user', null));
+      setShift(await apiService.getObject('pos_shift', DEFAULT_SHIFT));
+
+      // 所有資料就緒後，解除鎖定讓畫面渲染
+      setIsDataLoaded(true);
+    };
+    bootDatabase();
+  }, []);
 
   const openNumpad = (title, initialValue, onConfirm, allowDecimal = true) => {
     setNumpad({ isOpen: true, value: String(initialValue), onConfirm, title, allowDecimal });
@@ -217,6 +316,7 @@ export const POSProvider = ({ children }) => {
 
   // 系統遷移機制：確保舊資料擁有新的權限標籤
   useEffect(() => {
+    if (!isDataLoaded) return;
     setRoles(prevRoles => {
       let changed = false;
       const updatedRoles = prevRoles.map(role => {
@@ -231,9 +331,10 @@ export const POSProvider = ({ children }) => {
       });
       return changed ? updatedRoles : prevRoles;
     });
-  }, []);
+  }, [isDataLoaded]);
 
   useEffect(() => {
+    if (!isDataLoaded) return;
     const fixDate = (d) => {
       if (!d || typeof d !== 'string' || !d.includes('/')) return d;
       const parts = d.split('/');
@@ -248,7 +349,7 @@ export const POSProvider = ({ children }) => {
     if (orders.some(o => o.date && o.date.includes('/'))) { setOrders(p => p.map(o => ({ ...o, date: fixDate(o.date) }))); fixed = true; }
     if (dailySummaries.some(s => s.date && s.date.includes('/'))) { setDailySummaries(p => p.map(s => ({ ...s, date: fixDate(s.date) }))); fixed = true; }
     if (fixed) console.log('[System] Date format migration applied.');
-  }, []);
+  }, [isDataLoaded]);
 
   const showAlert = (title, message, type = 'info') => {
     setModal({
@@ -272,7 +373,6 @@ export const POSProvider = ({ children }) => {
     const today = getTodayDate();
     const newShift = { isOpen: true, businessDate: today, openedAt: getCurrentDateTime() };
     setShift(newShift);
-    try { localStorage.setItem('pos_shift', JSON.stringify(newShift)); } catch (e) { }
     showAlert('開帳成功', `營業日已設定為 ${today}。`, 'success');
   };
 
@@ -282,22 +382,36 @@ export const POSProvider = ({ children }) => {
     return userRole ? userRole.permissions.includes(permissionKey) : false;
   };
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('pos_templates', JSON.stringify(modifierTemplates));
-      localStorage.setItem('pos_menu', JSON.stringify(menu));
-      localStorage.setItem('pos_orders', JSON.stringify(orders));
-      localStorage.setItem('pos_daily_summaries', JSON.stringify(dailySummaries));
-      localStorage.setItem('pos_config', JSON.stringify(config));
-      localStorage.setItem('pos_discounts', JSON.stringify(discountRules));
-      localStorage.setItem('pos_shift', JSON.stringify(shift));
-      localStorage.setItem('pos_current_user', JSON.stringify(currentUser));
-      localStorage.setItem('pos_users', JSON.stringify(users));
-      localStorage.setItem('pos_roles', JSON.stringify(roles));
-    } catch (e) {
-      console.error("[POS_DEBUG] Storage save failed", e);
-    }
-  }, [menu, orders, dailySummaries, config, discountRules, shift, modifierTemplates, currentUser, users, roles]);
+  // --- 資料儲存連動 (自動透過 apiService 寫入底層 DB) ---
+  // 注意：確保只在 isDataLoaded 完成後，才監聽變更並寫入資料庫
+  useEffect(() => { if (isDataLoaded) apiService.saveArray('pos_templates', modifierTemplates); }, [modifierTemplates, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveArray('pos_menu', menu); }, [menu, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveArray('pos_orders', orders); }, [orders, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveArray('pos_daily_summaries', dailySummaries); }, [dailySummaries, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveObject('pos_config', config); }, [config, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveArray('pos_discounts', discountRules); }, [discountRules, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveObject('pos_shift', shift); }, [shift, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveObject('pos_current_user', currentUser); }, [currentUser, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveArray('pos_users', users); }, [users, isDataLoaded]);
+  useEffect(() => { if (isDataLoaded) apiService.saveArray('pos_roles', roles); }, [roles, isDataLoaded]);
+
+  // DB 啟動中的科技感 Loading 畫面
+  if (!isDataLoaded) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans selection:bg-blue-500/30">
+        <div className="relative w-24 h-24 mb-8">
+          <div className="absolute inset-0 border-4 border-slate-700 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <Database size={24} className="absolute inset-0 m-auto text-blue-400 animate-pulse" />
+        </div>
+        <h2 className="text-2xl font-black tracking-[0.2em] uppercase mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">System Booting</h2>
+        <p className="text-slate-400 text-sm font-bold flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span>
+          正在掛載本地資料庫引擎 ({apiService.isLocalMode() ? 'LocalStorage' : 'IndexedDB / Dexie'})...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <POSContext.Provider value={{
@@ -850,9 +964,10 @@ export const Sidebar = () => {
     { path: '/orders', label: '訂單管理', icon: ClipboardList, permission: 'ACCESS_ORDERS' },
     { path: '/settlement', label: '結算作業', icon: Coins, permission: 'ACCESS_SETTLEMENT' },
     { path: '/admin', label: '店務管理', icon: Edit2, permission: 'ACCESS_ADMIN' },
-    { path: '/staff', label: '員工與權限', icon: Users, permission: 'ACCESS_STAFF' }, // 新增專屬分頁
+    { path: '/staff', label: '員工與權限', icon: Users, permission: 'ACCESS_STAFF' },
     { path: '/dashboard', label: '報表分析', icon: LayoutDashboard, permission: 'ACCESS_DASHBOARD' },
     { path: '/database', label: '原始數據', icon: Database, permission: 'ACCESS_DATABASE' },
+    { path: '/devtools', label: '開發者工具', icon: Wrench, permission: 'ACCESS_DEVTOOLS' }, // 新增專屬導覽入口
     { path: '/settings', label: '系統設定', icon: Settings, permission: 'ACCESS_SETTINGS' },
   ].filter(item => hasPermission(item.permission));
 
@@ -1190,7 +1305,7 @@ export const OrderManagementPage = () => {
                   <div className="flex items-center gap-5">
                     {!o.isVoided && <button onClick={(e) => { e.stopPropagation(); handleVoidClick(o.id); }} className={`p-2 transition-colors ${!hasPermission('VOID_ORDERS') ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-red-500'}`}><RotateCcw size={18} /></button>}
                     <div className="text-right font-sans">
-                      <div className={`text-xl font-black font-mono font-mono font-mono ${o.isVoided ? 'text-slate-400' : 'text-slate-800'}`}>${o.total}</div>
+                      <div className={`text-xl font-black font-mono ${o.isVoided ? 'text-slate-400' : 'text-slate-800'}`}>${o.total}</div>
                       <div className={`text-[10px] font-black uppercase tracking-widest ${o.isVoided ? 'text-red-500' : 'text-blue-400'}`}>{o.isVoided ? 'VOID' : (o.paymentMethod || 'PAID')}</div>
                     </div>
                   </div>
@@ -1572,7 +1687,7 @@ export const StaffManagementPage = () => {
   const [tab, setTab] = useState('users');
 
   // 使用者表單狀態
-  const [newUser, setNewUser] = useState({ username: '', password: '', name: '', roleId: 'staff' });
+  const [newUser, useState] = useState({ username: '', password: '', name: '', roleId: 'staff' });
   const [editingUserId, setEditingUserId] = useState(null);
 
   // 角色表單狀態
@@ -2321,7 +2436,7 @@ export const DashboardPage = () => {
 
 // --- 12. DatabaseViewPage ---
 export const DatabaseViewPage = () => {
-  const { orders, showAlert, setOrders } = useContext(POSContext);
+  const { orders, showAlert, showConfirm, setOrders } = useContext(POSContext);
   const [search, setSearch] = useState('');
   const [viewJson, setViewJson] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -2368,10 +2483,13 @@ export const DatabaseViewPage = () => {
   return (
     <div className="max-w-full h-full flex flex-col overflow-hidden text-slate-900 px-2 font-sans">
       <div className="flex justify-between items-center mb-6 shrink-0">
-        <div><h2 className="text-2xl font-black flex items-center gap-2"><Database className="text-blue-600" /> 原始數據檢視</h2><p className="text-xs text-slate-400 mt-1">開發者專用：支援分頁與 JSON 導出</p></div>
-        <div className="flex gap-2">
-          <div className="relative w-72"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="搜尋、日期、ID或商品名..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm font-medium" /></div>
-          <button onClick={() => copyToClipboard(orders)} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-slate-800 active:scale-95"><Copy size={14} /> 導出全部 JSON</button>
+        <div>
+          <h2 className="text-2xl font-black flex items-center gap-2"><Database className="text-blue-600" /> 原始數據檢視</h2>
+          <p className="text-xs text-slate-400 mt-1">開發者專用：支援分頁與 JSON 導出</p>
+        </div>
+        <div className="flex gap-2 items-end">
+          <div className="relative w-72"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="搜尋、日期、ID或商品名..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm font-medium shadow-sm" /></div>
+          <button onClick={() => copyToClipboard(orders)} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-slate-800 active:scale-95 shadow-lg"><Copy size={14} /> 導出全部 JSON</button>
         </div>
       </div>
 
@@ -2678,7 +2796,126 @@ export const SettingsPage = () => {
   );
 };
 
-// --- 14. 主結構入口 (Route Protection) ---
+// --- 14. DeveloperToolsPage (開發者工具頁面) ---
+export const DeveloperToolsPage = () => {
+  const { showConfirm, showAlert } = useContext(POSContext);
+  const [isLocalStorage, setIsLocalStorage] = useState(apiService.isLocalMode());
+
+  const toggleStorageMode = () => {
+    const nextMode = !isLocalStorage;
+    showConfirm(
+      '切換資料庫引擎',
+      `確定要將系統切換至 ${nextMode ? 'LocalStorage' : 'IndexedDB'} 模式嗎？\n\n切換後系統將自動重新載入。`,
+      () => {
+        apiService.setLocalMode(nextMode);
+        window.location.reload();
+      },
+      'warning'
+    );
+  };
+
+  const clearDatabase = (type) => {
+    const dbName = type === 'ls' ? 'LocalStorage' : 'IndexedDB';
+    const isActive = (type === 'ls' && isLocalStorage) || (type === 'idb' && !isLocalStorage);
+
+    showConfirm(
+      `清除 ${dbName}`,
+      `確定要清空 ${dbName} 中的所有數據嗎？此操作無法復原。${isActive ? '\n\n⚠️ 警告：您目前正在使用此資料庫，清除後系統將自動重新載入。' : ''}`,
+      async () => {
+        try {
+          if (type === 'ls') {
+            localStorage.clear();
+          } else {
+            await db.delete();
+            await db.open(); // 清除後立刻重新初始化
+          }
+
+          if (isActive) {
+            window.location.reload();
+          } else {
+            showAlert('清除成功', `${dbName} 的資料已成功清空，且未影響目前運作中的系統。`, 'success');
+          }
+        } catch (e) {
+          showAlert('重置失敗', `清除 ${dbName} 時發生錯誤。`, 'danger');
+        }
+      },
+      'danger'
+    );
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto w-full font-sans pb-32 animate-in fade-in slide-in-from-bottom-2 px-4 text-slate-900">
+      <h2 className="text-2xl font-black mb-2 px-2 tracking-tight uppercase flex items-center gap-3">
+        <Wrench className="text-purple-600" /> 系統開發者工具
+      </h2>
+      <p className="text-slate-400 mb-8 px-2 font-medium">警告：此頁面包含底層系統配置與破壞性操作，僅供開發或系統維護人員使用。</p>
+
+      <div className="space-y-6">
+        {/* 資料庫引擎設定區塊 */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-8">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+              <Database size={20} className="text-blue-500" /> 資料庫引擎配置 (Storage Engine)
+            </h3>
+          </div>
+
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-200">
+            <div>
+              <p className="font-bold text-slate-800 text-lg mb-2">引擎切換控制</p>
+              <p className="text-xs text-slate-500 max-w-md leading-relaxed">
+                切換前端資料庫引擎。LocalStorage 與 IndexedDB 之間的資料彼此獨立，互不干擾。
+              </p>
+            </div>
+            <button onClick={toggleStorageMode} className={`flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-black transition-all shadow-md active:scale-95 ${isLocalStorage ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}>
+              <ToggleRight size={24} className={isLocalStorage ? "rotate-180 transition-transform" : "transition-transform"} />
+              切換至 {isLocalStorage ? 'IndexedDB' : 'LocalStorage'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            {/* LocalStorage 面板 */}
+            <div className={`p-6 rounded-3xl border-2 transition-all flex flex-col ${isLocalStorage ? 'bg-white border-blue-500 ring-4 ring-blue-50 shadow-lg' : 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100'}`}>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h4 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                    LocalStorage
+                    {isLocalStorage && <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded-lg uppercase tracking-widest font-black">使用中</span>}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">舊版系統相容性測試用，儲存於瀏覽器本地空間。容量限制約 5MB。</p>
+                </div>
+              </div>
+              <div className="mt-auto pt-6">
+                <button onClick={() => clearDatabase('ls')} className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 border border-red-100">
+                  <Trash2 size={18} /> 清除 LocalStorage
+                </button>
+              </div>
+            </div>
+
+            {/* IndexedDB 面板 */}
+            <div className={`p-6 rounded-3xl border-2 transition-all flex flex-col ${!isLocalStorage ? 'bg-white border-blue-500 ring-4 ring-blue-50 shadow-lg' : 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100'}`}>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h4 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                    IndexedDB (Dexie)
+                    {!isLocalStorage && <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded-lg uppercase tracking-widest font-black">使用中</span>}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">支援非同步高容量存取，為未來上線環境的標準配置。可儲存大量資料。</p>
+                </div>
+              </div>
+              <div className="mt-auto pt-6">
+                <button onClick={() => clearDatabase('idb')} className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 border border-red-100">
+                  <Trash2 size={18} /> 清除 IndexedDB
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- 15. 主結構入口 (Route Protection) ---
 const MainLayout = () => {
   const { hasPermission } = useContext(POSContext);
 
@@ -2695,6 +2932,7 @@ const MainLayout = () => {
             {hasPermission('ACCESS_STAFF') && <Route path="/staff" element={<StaffManagementPage />} />}
             {hasPermission('ACCESS_DASHBOARD') && <Route path="/dashboard" element={<DashboardPage />} />}
             {hasPermission('ACCESS_DATABASE') && <Route path="/database" element={<DatabaseViewPage />} />}
+            {hasPermission('ACCESS_DEVTOOLS') && <Route path="/devtools" element={<DeveloperToolsPage />} />}
             {hasPermission('ACCESS_SETTINGS') && <Route path="/settings" element={<SettingsPage />} />}
 
             {/* 阻擋無權限網址，統一導回有權限的第一個頁面，預設為收銀 */}
