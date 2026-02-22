@@ -1249,10 +1249,10 @@ export const OrderManagementPage = () => {
               <div key={o.id} onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`bg-white p-6 rounded-[2rem] border transition-all cursor-pointer ${expandedId === o.id ? 'ring-2 ring-blue-500 shadow-xl' : 'border-slate-100 hover:border-blue-200'}`}>
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="flex items-center gap-2 mb-1.5 font-black text-xl text-slate-800">
-                      #{o.orderNo}
-                      <span className="text-xs text-slate-400 font-medium">SN: {o.serialNo || 'N/A'}</span>
-                      <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-black">待付款</span>
+                    <div className="flex items-center gap-2 mb-1.5 font-black text-xl text-slate-800 font-mono">
+                      {o.serialNo || 'N/A'}
+                      <span className="text-sm text-slate-400 font-bold font-sans">#{o.orderNo}</span>
+                      <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-black font-sans">待付款</span>
                     </div>
                     <div className="text-xs text-slate-400 flex items-center gap-1 font-mono tracking-tight"><Clock size={12} />{o.date} {o.time}</div>
                   </div>
@@ -1298,7 +1298,10 @@ export const OrderManagementPage = () => {
                   <div className="flex items-center gap-4">
                     <div className={`p-2 rounded-xl ${o.isVoided ? 'bg-slate-200 text-slate-400' : 'bg-blue-50 text-blue-500'}`}>{o.orderType === 'takeOut' ? <ShoppingBag size={22} /> : <Utensils size={22} />}</div>
                     <div>
-                      <div className={`font-black text-base text-slate-800 flex items-center gap-2 ${o.isVoided ? 'line-through opacity-50' : ''}`}>#{o.orderNo} <span className="text-[10px] text-slate-400 font-medium normal-case">SN: {o.serialNo || 'N/A'}</span></div>
+                      <div className={`font-black text-base text-slate-800 flex items-center gap-2 font-mono ${o.isVoided ? 'line-through opacity-50' : ''}`}>
+                        {o.serialNo || 'N/A'}
+                        <span className="text-[11px] text-slate-400 font-bold font-sans">#{o.orderNo}</span>
+                      </div>
                       <div className="text-[10px] text-slate-400 font-mono tracking-tight">{o.date} {o.time}</div>
                     </div>
                   </div>
@@ -1687,7 +1690,7 @@ export const StaffManagementPage = () => {
   const [tab, setTab] = useState('users');
 
   // 使用者表單狀態
-  const [newUser, useState] = useState({ username: '', password: '', name: '', roleId: 'staff' });
+  const [newUser, setNewUser] = useState({ username: '', password: '', name: '', roleId: 'staff' });
   const [editingUserId, setEditingUserId] = useState(null);
 
   // 角色表單狀態
@@ -2073,16 +2076,16 @@ export const SettlementPage = () => {
               <div key={order.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${order.isVoided ? 'opacity-30' : 'border-blue-200 shadow-blue-50 shadow-sm'}`}>
                 <div onClick={() => setExpandOrderId(isOrderExpand ? null : order.id)} className="flex items-center px-6 py-5 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
                   <div className="flex-1">
-                    <div className="font-bold flex items-center text-slate-700">
-                      #{order.orderNo || 'N/A'}
-                      <span className="text-[10px] text-slate-400 font-medium mx-2">SN: {order.serialNo || 'N/A'}</span>
-                      <span className={`ml-1 text-[10px] px-2 py-0.5 rounded font-bold ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                    <div className="font-bold flex items-center text-slate-700 font-mono text-lg">
+                      {order.serialNo || 'N/A'}
+                      <span className="text-[11px] text-slate-400 font-bold mx-2 font-sans">#{order.orderNo || 'N/A'}</span>
+                      <span className={`ml-1 text-[10px] px-2 py-0.5 rounded font-bold font-sans ${order.isVoided ? 'bg-red-100 text-red-600' : order.orderType === 'takeOut' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
                         {order.isVoided ? '已作廢' : order.orderType === 'takeOut' ? '外帶' : '內用'}
                       </span>
                       {order.status === 'closed' ? (
-                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-gray-200 text-gray-600">已結算</span>
+                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-gray-200 text-gray-600 font-sans">已結算</span>
                       ) : (
-                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-green-100 text-green-600 animate-pulse">未結算</span>
+                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-green-100 text-green-600 animate-pulse font-sans">未結算</span>
                       )}
                     </div>
                     <div className="text-xs font-mono italic text-slate-400 mt-1">
@@ -2237,11 +2240,11 @@ export const DashboardPage = () => {
                               <div key={order.id} className={`bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm ${order.isVoided ? 'opacity-40 grayscale' : ''}`}>
                                 <div onClick={(e) => { e.stopPropagation(); toggleOrderExpand(order.id); }} className="flex items-center px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors text-slate-900">
                                   <div className="flex-col flex-1">
-                                    <span className={`text-sm font-bold ${order.isVoided ? 'line-through text-red-400' : 'text-slate-700'}`}>
-                                      #{order.orderNo || 'N/A'}
-                                      <span className="text-[10px] font-normal text-slate-400 ml-2">SN: {order.serialNo || 'N/A'}</span>
+                                    <span className={`text-sm font-bold font-mono ${order.isVoided ? 'line-through text-red-400' : 'text-blue-600'}`}>
+                                      {order.serialNo || 'N/A'}
+                                      <span className="text-[10px] font-bold text-slate-400 ml-2 font-sans">#{order.orderNo || 'N/A'}</span>
                                     </span>
-                                    <span className="text-[10px] text-slate-400 block mt-0.5">{order.time}</span>
+                                    <span className="text-[10px] text-slate-400 block mt-0.5 font-sans">{order.time}</span>
                                   </div>
                                   <div className="flex-1">{order.isVoided ? <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">已作廢</span> : (order.orderType === 'takeOut' ? <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-md font-bold">外帶</span> : <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-1 rounded-md font-bold">內用</span>)}</div>
                                   <div className="text-lg font-black mr-4 text-slate-800 font-mono">${order.total}</div>
@@ -2354,8 +2357,8 @@ export const DashboardPage = () => {
 
                     <div className="text-xs space-y-1 mb-4 border-b border-dashed border-slate-300 pb-4 text-slate-600">
                       <div className="flex justify-between"><span>日期</span><span>{order.date} {order.time}</span></div>
+                      <div className="flex justify-between font-bold text-blue-600"><span>序號</span><span>{order.serialNo || 'N/A'}</span></div>
                       <div className="flex justify-between"><span>單號</span><span>#{order.orderNo}</span></div>
-                      <div className="flex justify-between"><span>序號</span><span>{order.serialNo || 'N/A'}</span></div>
                       <div className="flex justify-between"><span>狀態</span><span className={order.isVoided ? 'text-red-500 font-bold' : ''}>{order.isVoided ? '作廢 (Void)' : '已結算 (Paid)'}</span></div>
                       <div className="truncate mt-1 text-[10px] text-slate-400">UUID: {order.id}</div>
                     </div>
@@ -2485,7 +2488,12 @@ export const DatabaseViewPage = () => {
       <div className="flex justify-between items-center mb-6 shrink-0">
         <div>
           <h2 className="text-2xl font-black flex items-center gap-2"><Database className="text-blue-600" /> 原始數據檢視</h2>
-          <p className="text-xs text-slate-400 mt-1">開發者專用：支援分頁與 JSON 導出</p>
+          <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+            開發者專用：支援分頁與 JSON 導出
+            <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-widest ${apiService.isLocalMode() ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+              當前引擎: {apiService.isLocalMode() ? 'LocalStorage' : 'IndexedDB (Dexie)'}
+            </span>
+          </p>
         </div>
         <div className="flex gap-2 items-end">
           <div className="relative w-72"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="搜尋、日期、ID或商品名..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm font-medium shadow-sm" /></div>
@@ -2499,7 +2507,7 @@ export const DatabaseViewPage = () => {
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10 shadow-sm">
               <tr>
                 <th className="p-4 w-12 text-center">#</th>
-                <th className="p-4">OrderNo / Serial</th>
+                <th className="p-4">Serial / OrderNo</th>
                 <th className="p-4">Date/Time</th>
                 <th className="p-4">Status</th>
                 <th className="p-4 text-right">Total</th>
@@ -2514,8 +2522,8 @@ export const DatabaseViewPage = () => {
                   <tr onClick={() => setExpandedId(expandedId === o.id ? null : o.id)} className={`cursor-pointer transition-colors ${expandedId === o.id ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'}`}>
                     <td className="p-4 text-center"><ChevronRight size={14} className={`text-slate-300 transition-transform ${expandedId === o.id ? 'rotate-90 text-blue-500' : ''}`} /></td>
                     <td className="p-4 font-bold text-slate-700">
-                      <div>#{o.orderNo}</div>
-                      <div className="text-[9px] text-slate-400 font-mono mt-0.5">{o.serialNo || 'N/A'}</div>
+                      <div className="font-mono text-sm text-blue-600">{o.serialNo || 'N/A'}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5 font-sans">#{o.orderNo}</div>
                     </td>
                     <td className="p-4 text-slate-500 font-medium">{o.date} <span className="text-[10px] text-slate-300 ml-1">{o.time}</span></td>
                     <td className="p-4"><span className={`font-bold uppercase text-[9px] ${o.status === 'closed' ? 'text-slate-400' : 'text-green-600'}`}>{o.status}</span></td>
@@ -2652,7 +2660,7 @@ export const DatabaseViewPage = () => {
       {viewJson && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in font-sans text-slate-900">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50 font-sans"><h3 className="font-black text-xl">原始數據 JSON - #{viewJson.orderNo}</h3><button onClick={() => setViewJson(null)} className="p-2 hover:bg-red-100 text-red-500 rounded-2xl transition-all"><X size={24} /></button></div>
+            <div className="p-8 border-b flex justify-between items-center bg-slate-50 font-sans"><h3 className="font-black text-xl">原始數據 JSON - {viewJson.serialNo || viewJson.orderNo}</h3><button onClick={() => setViewJson(null)} className="p-2 hover:bg-red-100 text-red-500 rounded-2xl transition-all"><X size={24} /></button></div>
             <div className="flex-1 overflow-auto p-8 bg-slate-900 font-mono"><pre className="text-green-400 text-xs whitespace-pre-wrap leading-relaxed">{JSON.stringify(viewJson, null, 2)}</pre></div>
           </div>
         </div>
@@ -2661,7 +2669,7 @@ export const DatabaseViewPage = () => {
       {editingOrder && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
-            <h3 className="font-black text-xl mb-4">編輯訂單 #{editingOrder.orderNo}</h3>
+            <h3 className="font-black text-xl mb-4">編輯單據 {editingOrder.serialNo || editingOrder.orderNo}</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500">狀態 (Status)</label>
